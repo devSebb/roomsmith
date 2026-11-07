@@ -17,6 +17,7 @@ export interface AppProps {
 
 const CATEGORIES = ['sofa', 'armchair', 'chair', 'bed_double', 'bed_single', 'nightstand', 'desk', 'table_dining', 'table_coffee', 'table_side', 'bookshelf', 'shelf', 'wardrobe', 'dresser', 'cabinet', 'sideboard', 'tv_stand', 'tv', 'rug', 'plant', 'lamp_floor', 'lamp_table', 'fridge', 'counter', 'washing_machine', 'piano', 'ottoman', 'bench', 'other']
 const nice = (c: string) => c.replace(/_/g, ' ')
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 function useStore(store: Store) {
   const [s, setS] = React.useState(store.state)
@@ -414,7 +415,7 @@ function AddPanel({ store, scene }: { store: Store; scene: Scene }) {
   const [fit, setFit] = React.useState({ w: '', h: '', d: '' })
   const [fitRes, setFitRes] = React.useState<string>('')
   const add = () => {
-    const op: Record<string, unknown> = { op: 'add_object', name: name.trim() || nice(cat), category: cat }
+    const op: Record<string, unknown> = { op: 'add_object', name: name.trim() || cap(nice(cat)), category: cat }
     const w = +dims.w, h = +dims.h, d = +dims.d
     if (w > 0 && h > 0 && d > 0) op.dimensions_m = [w, h, d]
     store.apply([op as any]).then(r => { const id = r?.results?.[0]?.created_id; if (id) store.select(id) })

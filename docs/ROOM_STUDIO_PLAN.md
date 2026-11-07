@@ -565,7 +565,11 @@ These rules come from Sebb and Harvey (7 November) and override anything earlier
 | Mac mini (over Tailscale SSH as `jessica`) | **Runtime testing only, in an explicitly approved isolated Hermes home** with its own config, plugin-data, dependencies/venv and model sign-in. Later, Harvey's clean-install test. | Reading versions and docs; running the plugin inside the isolated home once approved | Installing into or copying code into the live `~/.hermes` or `~/.hermes/plugins/`; touching production profiles, shared dependencies, gateways, Mission Control or Tailscale; changing SSH config or keys without instruction |
 | GitHub `devSebb/room-studio` | Distribution. Final installs happen from a pinned commit with `hermes plugins install devSebb/room-studio --ref <sha>` | Public repo once Sebb says so | Self-updating; force-pushes to pinned history |
 
-Code reaches the mini only through Git (clone of a pushed commit into the isolated home), never by copying a working tree. Harvey reviews immutable commits; C1/C2/C3 handoffs are kept substantial. Ordinary testing work is batched; only genuine access, safety, budget or scope blockers are escalated.
+Code reaches the mini only through Git (clone of a pushed commit into the isolated home), never by copying a working tree.
+
+**Desktop against a remote backend (verified in the Desktop SDK docs, 7 Nov):** the Desktop app only scans the *local* machine's `~/.hermes/plugins` and `~/.hermes/desktop-plugins` for a `desktop/plugin.js`; the remote box's plugin folder is not reachable as a filesystem. So for a demo with Desktop on the MacBook talking to the Mini, the Desktop half is installed on the MacBook (or the whole package in the MacBook's `~/.hermes/plugins/room-studio`, desktop half enabled in Settings → Plugins) while `ctx.rest` reaches the Mini's `/api/plugins/room-studio/`. Alternatively Desktop runs on the Mini itself. Both are supported arrangements; which one we use is Sebb's call.
+
+**Local lower-bound runtime (set up 7 Nov):** `.scratch/hermes-home/` is an isolated `HERMES_HOME` on the MacBook with `plugins/room-studio -> <repo>` and `plugins.enabled: [room-studio]`; `HERMES_HOME=<that> hermes dashboard --port 9119 --no-open` serves the tab from the MacBook's unused 0.21.0 install without touching its real `~/.hermes`. Harvey reviews immutable commits; C1/C2/C3 handoffs are kept substantial. Ordinary testing work is batched; only genuine access, safety, budget or scope blockers are escalated.
 
 ---
 
@@ -580,17 +584,17 @@ Each milestone has a goal, deliverables, and exit criteria that are yes-or-no. T
 | Spike | Question | Pass |
 |---|---|---|
 | S0 | Can the Mini be reached read-only, and what Hermes version and model does it run? | **Passed 7 Nov:** `jessica`, Hermes v0.21.5 (git, dirty tree), Python 3.14.7. Model (GPT astra) per Sebb, not yet read from config |
-| S1 | Does a skeleton plugin load in the approved isolated Mini test home (and in the MacBook v0.21.0 as lower bound)? | `hermes plugins doctor` passes; the tool shows in a chat and returns JSON |
-| S2 | Does `ctx.llm.complete_structured` accept an image through the plugin LLM door on the Mini's model (GPT astra, subscription)? This is a different door from chat and may use Hermes's vision-fallback routing | One call, parsed result — or a recorded "no", which makes Route B primary |
-| S3 | Is a photo-read draft good enough to be worth editing? | On three photos: a room every time; most large furniture found; positions roughly right. Recorded as fixtures |
-| S4 | Does a Desktop pane with bundled three.js load, pass the lint, and stay under 1 MB? | A lit box rendered in Hermes Desktop |
-| S5 | Does a tool write in chat reach the pane through the backend? | Revision number in the pane changes after a tool call |
-| S6 | How does a photo attached in chat reach a tool? | A documented answer for CLI and Desktop, or Route B confirmed as the path |
-| S7 | Can we run `hermes plugins validate` without touching any live install? | Skeleton passes on a separate throwaway Hermes v0.23.0 |
+| S1 | Does a skeleton plugin load in the approved isolated Mini test home (and in the MacBook v0.21.0 as lower bound)? | **Passed 7 Nov on 0.21.0 (MacBook, isolated home):** `hermes plugins doctor --ci` OK (9 tools, 1 hook); the dashboard tab and backend run inside the real `hermes dashboard`. Mini run pending |
+| S2 | Does `ctx.llm.complete_structured` accept an image through the plugin LLM door on the Mini's model (GPT astra, subscription)? This is a different door from chat and may use Hermes's vision-fallback routing | Pending (Mini test home). Code path implemented with a fallback ladder; tested with a fake `ctx.llm` |
+| S3 | Is a photo-read draft good enough to be worth editing? | Pending (needs 3–5 photos). Draft builder tested on fixture drafts |
+| S4 | Does a Desktop pane with bundled three.js load, pass the lint, and stay under 1 MB? | **Half passed 7 Nov:** both bundles 593 KB; Desktop lint clean (mirrored regexes); the same editor renders in the real dashboard. Desktop app run pending |
+| S5 | Does a tool write in chat reach the pane through the backend? | **Passed 7 Nov:** an agent-actor command through the backend appears in the editor within ~1 s (long-poll) with a toast and a flash |
+| S6 | How does a photo attached in chat reach a tool? | Pending on the Mini. Route B (`new_room` with `layout`) is implemented and tested as the path that needs nothing from the host |
+| S7 | Can we run `hermes plugins validate` without touching any live install? | Pending (throwaway Hermes v0.23.0) |
 
 **Exit:** a filled-in results table. Any failed spike has its fallback chosen (section 19) before M1 starts.
 
-### M1 — Room engine (Saturday morning)
+### M1 — Room engine (Saturday morning) — **done Friday 7 Nov** (73 tests; commit 1091695)
 
 **Goal:** the room exists as data, with edits, rules and history, independent of Hermes.
 
@@ -598,7 +602,7 @@ Each milestone has a goal, deliverables, and exit criteria that are yes-or-no. T
 
 **Exit:** all engine tests pass; the two-process test passes; a script creates a room, applies twenty mixed commands, undoes ten, redoes five, and the final scene matches a stored expected file.
 
-### M2 — Hermes can edit a room (Saturday afternoon)
+### M2 — Hermes can edit a room (Saturday afternoon) — **done Friday 7 Nov** (doctor passes; commit 2338cef)
 
 **Goal:** a complete chat-only experience.
 
@@ -606,7 +610,7 @@ Each milestone has a goal, deliverables, and exit criteria that are yes-or-no. T
 
 **Exit:** in a real Hermes chat, with no editor: create a 4 × 5 m room, add five objects, "swap the sofa and the desk", "put the bookshelf against the north wall", ask "does anything overlap?", undo twice. Each step changes the saved scene as expected. Doctor passes.
 
-### M3 — The editor (Sunday)
+### M3 — The editor (Sunday) — **core done Friday 7 Nov** (commit 3fd350b); Desktop-app run and polish remain
 
 **Goal:** see and edit the room by hand, live with Hermes.
 
