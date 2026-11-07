@@ -1,0 +1,13 @@
+{
+  "name": "room-studio",
+  "label": "Room Studio",
+  "description": "Photo to editable 3D room; edit by hand or with Hermes; add products at true size; check what fits.",
+  "icon": "Package",
+  "version": "0.1.0",
+  "tab": {
+    "path": "/room-studio",
+    "position": "end"
+  },
+  "entry": "dist/index.js",
+  "api": "plugin_api.py"
+}
