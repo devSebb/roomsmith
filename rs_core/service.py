@@ -290,7 +290,11 @@ class RoomService:
                     break
                 head = self.store.head(pid)
                 label = "Undo" if mode == "undo" else "Redo"
-                what = head["summary"] if mode == "undo" else f"back to revision {target}"
+                prev = head["summary"]
+                for prefix in ("Hermes: ", "You: ", "System: "):
+                    if prev.startswith(prefix):
+                        prev = prev[len(prefix):]
+                what = prev if mode == "undo" else f"back to revision {target}"
                 summary = f"{label}: {what}"
                 self.store.commit_revision(pid, head["revision"], scene, self._actor(actor), summary, head["changed_ids"], history_mode=mode, restore_revision=target)
                 done += 1

@@ -1,0 +1,27 @@
+{
+  "name": "room-studio-web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Source for Room Studio's editor: built into desktop/plugin.js and dashboard/dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "check": "tsc --noEmit",
+    "test": "node --test tests/",
+    "dev": "node build.mjs --dev"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@types/three": "0.170.0",
+    "esbuild": "0.24.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "three": "0.170.0",
+    "typescript": "5.6.3"
+  },
+  "allowScripts": {
+    "esbuild@0.24.0": true
+  }
+}

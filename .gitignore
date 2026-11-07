@@ -21,3 +21,4 @@ fixtures/photos/
 .DS_Store
 .idea/
 .vscode/
+.scratch-dev.log

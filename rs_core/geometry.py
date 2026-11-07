@@ -196,8 +196,9 @@ def right_vector(yaw: float) -> Point:
 
 
 def yaw_facing(direction: Point) -> float:
-    """Yaw at which front_vector equals `direction`."""
-    return math.atan2(-direction[0], -direction[1])
+    """Yaw at which front_vector equals `direction`, in (-pi, pi] (so -0.0 inputs
+    never produce -pi where +pi is meant)."""
+    return normalize_yaw(math.atan2(-direction[0], -direction[1]))
 
 
 def normalize_yaw(yaw: float) -> float:

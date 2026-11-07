@@ -232,11 +232,16 @@ async def get_photo(photo_id: str):
 
 
 @router.get("/projects/{project_id}/export")
-async def export(project_id: str, format: str = "glb"):
+async def export(project_id: str, format: str = "glb", encoding: str | None = None):
     out = _svc().export_bytes(project_id, format if format in ("glb", "json", "summary") else "glb")
     if isinstance(out, dict):
         return _reply(out)
     data, mime, filename = out
+    if encoding == "base64":
+        # for hosts whose REST client only speaks JSON (Hermes Desktop's ctx.rest)
+        import base64
+
+        return JSONResponse({"ok": True, "filename": filename, "mime": mime, "bytes": len(data), "base64": base64.b64encode(data).decode("ascii")})
     return Response(content=data, media_type=mime, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
