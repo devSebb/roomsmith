@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.venv-*/
+.pytest_cache/
+*.egg-info/
+
+# Node
+web/node_modules/
+web/.cache/
+
+# Local data and photos never enter git
+fixtures/photos/
+*.db
+*.db-wal
+*.db-shm
+.scratch/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

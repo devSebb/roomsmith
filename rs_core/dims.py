@@ -1,0 +1,240 @@
+"""Parse product dimension text into metres.
+
+Handles the shapes retailers actually use:
+    "W 180 x D 88 x H 76 cm"      "180 x 88 x 76 cm"       "180x88x76cm"
+    "Width: 228 cm Depth: 93 cm Height: 83 cm"
+    "71 x 35 x 30 in"              "71\" W x 35\" D x 30\" H"
+    "6 ft 2 in x 3 ft"             "L 200 cm, W 90 cm, H 45 cm"
+    "1800 x 880 x 760 mm"          "1,8 m x 0,88 m"   (decimal commas)
+Returns a dict {width_m, height_m, depth_m, assumed_order, confidence, parsed_from}.
+Unlabelled triples are read as width x depth x height (the most common
+furniture convention) and flagged ``assumed_order``.
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Any
+
+UNIT_TO_M = {
+    "mm": 0.001,
+    "millimeter": 0.001,
+    "millimetre": 0.001,
+    "cm": 0.01,
+    "centimeter": 0.01,
+    "centimetre": 0.01,
+    "m": 1.0,
+    "meter": 1.0,
+    "metre": 1.0,
+    "in": 0.0254,
+    "inch": 0.0254,
+    "inches": 0.0254,
+    '"': 0.0254,
+    "”": 0.0254,
+    "ft": 0.3048,
+    "foot": 0.3048,
+    "feet": 0.3048,
+    "'": 0.3048,
+    "’": 0.3048,
+}
+
+LABELS = {
+    "w": "width",
+    "width": "width",
+    "wide": "width",
+    "breite": "width",
+    "ancho": "width",
+    "largeur": "width",
+    "d": "depth",
+    "depth": "depth",
+    "deep": "depth",
+    "tiefe": "depth",
+    "profundidad": "depth",
+    "profondeur": "depth",
+    "l": "length",
+    "length": "length",
+    "long": "length",
+    "länge": "length",
+    "largo": "length",
+    "longueur": "length",
+    "h": "height",
+    "height": "height",
+    "high": "height",
+    "tall": "height",
+    "höhe": "height",
+    "alto": "height",
+    "hauteur": "height",
+}
+
+_NUM = r"(?:\d+(?:[.,]\d+)?)"
+_UNIT = r"(?:mm|cm|m|in|inches|inch|ft|feet|foot|\"|”|'|’|millimet(?:er|re)s?|centimet(?:er|re)s?|met(?:er|re)s?)"
+_LABEL = r"(?:" + "|".join(sorted((re.escape(k) for k in LABELS), key=len, reverse=True)) + r")"
+
+# "6 ft 2 in" / "6'2\"" compound imperial
+_FT_IN = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:ft|feet|foot|'|’)\s*(\d+(?:[.,]\d+)?)?\s*(?:in|inch|inches|\"|”)?", re.I)
+
+# labelled value: "W 180 cm", "Width: 228 cm", "180 cm W", "71\" W"
+_LABEL_FIRST = re.compile(rf"\b({_LABEL})\b\s*[:=]?\s*({_NUM})\s*({_UNIT})?", re.I)
+_VALUE_FIRST = re.compile(rf"({_NUM})\s*({_UNIT})?\s*\b({_LABEL})\b", re.I)
+_TRIPLE = re.compile(rf"({_NUM})\s*({_UNIT})?\s*(?:x|×|\*|by)\s*({_NUM})\s*({_UNIT})?\s*(?:x|×|\*|by)\s*({_NUM})\s*({_UNIT})?", re.I)
+_PAIR = re.compile(rf"({_NUM})\s*({_UNIT})?\s*(?:x|×|\*|by)\s*({_NUM})\s*({_UNIT})?", re.I)
+_TRAILING_UNIT = re.compile(rf"\b({_UNIT})\b\s*$", re.I)
+
+
+def _to_float(s: str) -> float:
+    return float(s.replace(",", "."))
+
+
+def _unit_factor(unit: str | None, default: str | None) -> tuple[float | None, str | None]:
+    u = (unit or default or "").strip().lower()
+    if not u:
+        return None, None
+    if u in UNIT_TO_M:
+        return UNIT_TO_M[u], u
+    for k, v in UNIT_TO_M.items():
+        if u.startswith(k):
+            return v, k
+    return None, None
+
+
+def _guess_unit(values: list[float]) -> str:
+    """When no unit is written: mm if values are in the hundreds-thousands,
+    cm if tens-hundreds, m if small, inches if moderate and non-metric looking."""
+    mx = max(values)
+    if mx > 1000:
+        return "mm"
+    if mx > 12:
+        return "cm"
+    return "m"
+
+
+def parse_dimensions(text: str | None, default_unit: str | None = None) -> dict[str, Any] | None:
+    """Return parsed dimensions or None when nothing usable is found."""
+    if not text or not isinstance(text, str):
+        return None
+    raw = text.strip()
+    s = raw.replace("×", "x").replace("＊", "*")
+    s = re.sub(r"(\d),(\d{3})(?!\d)", r"\1\2", s)  # 1,800 -> 1800 (thousands separators)
+    labelled: dict[str, float] = {}
+    unit_seen: str | None = None
+
+    # trailing unit applies to all values ("180 x 88 x 76 cm")
+    m_tr = _TRAILING_UNIT.search(s)
+    trailing_unit = m_tr.group(1) if m_tr else None
+
+    # compound imperial first ("6 ft 2 in")
+    comp = []
+    for mt in _FT_IN.finditer(s):
+        ft = _to_float(mt.group(1))
+        inch = _to_float(mt.group(2)) if mt.group(2) else 0.0
+        comp.append(ft * 0.3048 + inch * 0.0254)
+
+    for mt in _LABEL_FIRST.finditer(s):
+        label = LABELS[mt.group(1).lower()]
+        factor, u = _unit_factor(mt.group(3), trailing_unit or default_unit)
+        val = _to_float(mt.group(2))
+        if factor is None:
+            factor = UNIT_TO_M[_guess_unit([val])]
+        else:
+            unit_seen = u
+        labelled.setdefault(label, val * factor)
+    for mt in _VALUE_FIRST.finditer(s):
+        label = LABELS[mt.group(3).lower()]
+        factor, u = _unit_factor(mt.group(2), trailing_unit or default_unit)
+        val = _to_float(mt.group(1))
+        if factor is None:
+            factor = UNIT_TO_M[_guess_unit([val])]
+        else:
+            unit_seen = u
+        labelled.setdefault(label, val * factor)
+
+    if labelled:
+        # "L x W x H" listings (sofas, tables, rugs): L is the long side across the
+        # front, W is front-to-back. With only W, D, H: the usual meaning.
+        if "length" in labelled and "width" in labelled and "depth" not in labelled:
+            width = labelled["length"]
+            depth = labelled["width"]
+        else:
+            width = labelled.get("width", labelled.get("length"))
+            depth = labelled.get("depth")
+            if depth is None and "length" in labelled and "width" not in labelled:
+                depth = None
+        height = labelled.get("height")
+        if width is not None and depth is not None and height is not None:
+            return _result(width, height, depth, raw, assumed_order=False, confidence=0.95)
+        if width is not None and (depth is not None or height is not None):
+            out = _result(width, height if height is not None else 0.0, depth if depth is not None else 0.0, raw, assumed_order=False, confidence=0.7)
+            out["partial"] = True
+            out["missing"] = [k for k, v in (("height_m", height), ("depth_m", depth)) if v is None]
+            return out
+
+    mt = _TRIPLE.search(s)
+    if mt:
+        nums = [_to_float(mt.group(i)) for i in (1, 3, 5)]
+        units = [mt.group(i) for i in (2, 4, 6)]
+        last_unit = next((u for u in reversed(units) if u), None) or trailing_unit or default_unit
+        vals = []
+        for v, u in zip(nums, units):
+            factor, _ = _unit_factor(u or last_unit, None)
+            if factor is None:
+                factor = UNIT_TO_M[_guess_unit(nums)]
+            vals.append(v * factor)
+        # unlabelled: assume W x D x H
+        return _result(vals[0], vals[2], vals[1], raw, assumed_order=True, confidence=0.6)
+
+    if len(comp) >= 3:
+        return _result(comp[0], comp[2], comp[1], raw, assumed_order=True, confidence=0.55)
+
+    mt = _PAIR.search(s)
+    if mt:
+        nums = [_to_float(mt.group(1)), _to_float(mt.group(3))]
+        units = [mt.group(2), mt.group(4)]
+        last_unit = next((u for u in reversed(units) if u), None) or trailing_unit or default_unit
+        vals = []
+        for v, u in zip(nums, units):
+            factor, _ = _unit_factor(u or last_unit, None)
+            if factor is None:
+                factor = UNIT_TO_M[_guess_unit(nums)]
+            vals.append(v * factor)
+        out = _result(vals[0], 0.0, vals[1], raw, assumed_order=True, confidence=0.4)
+        out["partial"] = True
+        out["missing"] = ["height_m"]
+        return out
+
+    if len(comp) == 2:
+        out = _result(comp[0], 0.0, comp[1], raw, assumed_order=True, confidence=0.4)
+        out["partial"] = True
+        out["missing"] = ["height_m"]
+        return out
+    _ = unit_seen
+    return None
+
+
+def _result(width: float, height: float, depth: float, raw: str, assumed_order: bool, confidence: float) -> dict[str, Any]:
+    return {
+        "width_m": round(width, 4),
+        "height_m": round(height, 4),
+        "depth_m": round(depth, 4),
+        "assumed_order": assumed_order,
+        "order_note": "Read as width x depth x height; say so if the listing uses another order." if assumed_order else "",
+        "confidence": confidence,
+        "parsed_from": raw,
+    }
+
+
+def parse_length(text: str | None, default_unit: str | None = None) -> float | None:
+    """One length ("4.2 m", "14 ft", "6'2\"", "250cm") -> metres."""
+    if not text or not isinstance(text, str):
+        return None
+    s = text.strip()
+    mt = _FT_IN.search(s)
+    if mt and (mt.group(2) or re.search(r"ft|feet|foot|'|’", s, re.I)):
+        return _to_float(mt.group(1)) * 0.3048 + (_to_float(mt.group(2)) if mt.group(2) else 0.0) * 0.0254
+    mt = re.search(rf"({_NUM})\s*({_UNIT})?", s, re.I)
+    if not mt:
+        return None
+    val = _to_float(mt.group(1))
+    factor, _ = _unit_factor(mt.group(2), default_unit)
+    if factor is None:
+        factor = UNIT_TO_M[_guess_unit([val])]
+    return val * factor
