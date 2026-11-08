@@ -527,34 +527,94 @@ def op_swap_objects(scene: dict, op: dict) -> OpResult:
 # ---------------------------------------------------------------- scale
 
 
+CALIBRATE_KINDS = ("wall_length", "room_height", "opening_width", "object_width", "object_height", "object_depth", "room_size")
+HUG_DISTANCE_M = 0.08  # an object this close to a wall before calibration is kept against it after
+
+
 def op_calibrate(scene: dict, op: dict) -> OpResult:
-    """Rescale the whole scene so that one known length becomes real.
+    """Fit the estimated scene to one or two real measurements.
 
     reference: {"kind": "wall_length"|"room_height"|"opening_width"|"object_width"|
                 "object_height"|"object_depth", "id": "...", "real_m": 4.2}
-    Objects whose dimensions are stated or measured keep their size; only their
-    positions scale. Everything estimated scales.
+            or {"kind": "room_size", "width_m": 2.85, "depth_m": 3.0}
+
+    A room measurement (wall, height, opening, room_size) corrects the room and
+    where things stand; furniture keeps its size (photo estimates of furniture are
+    anchored on known object sizes and are usually better than the room estimate;
+    wide-angle photos stretch depth far more than width, so room_size scales the
+    two axes independently). An object measurement scales everything estimated,
+    because it reveals the model's overall scale. Objects that stood against a
+    wall stay against it; stated/measured dimensions never change.
     """
     ref = op.get("reference") if isinstance(op.get("reference"), dict) else op
-    kind = _str(ref.get("kind", ""), "kind", ("wall_length", "room_height", "opening_width", "object_width", "object_height", "object_depth"))
-    real = _num(ref.get("real_m"), "real_m", 0.05, 60.0)
-    current = _reference_value(scene, kind, ref.get("id"))
-    if current <= 1e-6:
-        raise SceneError("invalid_value", "Reference length is zero; cannot calibrate")
-    k = real / current
-    _scale_scene(scene, k)
-    scene["calibration"] = {
-        "status": "calibrated",
-        "reference": {"kind": kind, "id": ref.get("id"), "real_m": real},
-        "scale_applied": k,
-    }
+    kind = _str(ref.get("kind", ""), "kind", CALIBRATE_KINDS)
+    hugs = _wall_hugs(scene)
+    if kind == "room_size":
+        _require(ref, "width_m", "depth_m")
+        cur_w, cur_d = m.room_size(scene)
+        real_w = _num(ref["width_m"], "width_m", m.ROOM_SIDE_MIN, m.ROOM_SIDE_MAX)
+        real_d = _num(ref["depth_m"], "depth_m", m.ROOM_SIDE_MIN, m.ROOM_SIDE_MAX)
+        kx, kz = real_w / cur_w, real_d / cur_d
+        _scale_scene(scene, kx, kz, scale_dims=False)
+        reference = {"kind": kind, "width_m": real_w, "depth_m": real_d}
+        summary = f"Calibrated: room is {_fmt(real_w)} x {_fmt(real_d)} m (x{kx:.3f} across, x{kz:.3f} deep; furniture sizes kept)"
+        details = {"scale_x": kx, "scale_z": kz}
+    else:
+        real = _num(ref.get("real_m"), "real_m", 0.05, 60.0)
+        current = _reference_value(scene, kind, ref.get("id"))
+        if current <= 1e-6:
+            raise SceneError("invalid_value", "Reference length is zero; cannot calibrate")
+        k = real / current
+        scale_dims = kind.startswith("object_")
+        _scale_scene(scene, k, k, scale_dims=scale_dims, scale_height=True)
+        reference = {"kind": kind, "id": ref.get("id"), "real_m": real}
+        what = "everything estimated" if scale_dims else "room and positions; furniture sizes kept"
+        summary = f"Calibrated: {kind.replace('_', ' ')} {ref.get('id') or ''} = {_fmt(real)} m (x{k:.3f}, {what})".replace("  ", " ")
+        details = {"scale": k}
+    _restore_wall_hugs(scene, hugs)
+    if kind == "room_size":
+        from rs_core.layout import nudge_apart  # compression can push estimated objects into each other
+
+        moved = nudge_apart(scene)
+        if moved:
+            details["nudged"] = moved
+            summary += f"; nudged apart: {', '.join(moved)}"
+    scene["calibration"] = {"status": "calibrated", "reference": reference, **details}
     ids = [v["id"] for v in scene["room"]["vertices"]] + [o["id"] for o in scene["objects"]] + [o["id"] for o in scene["room"]["openings"]]
-    return OpResult(
-        "calibrate",
-        f"Calibrated: {kind.replace('_', ' ')} {ref.get('id') or ''} = {_fmt(real)} m (scene scaled x{k:.3f})".replace("  ", " "),
-        ids,
-        details={"scale": k},
-    )
+    return OpResult("calibrate", summary, ids, details=details)
+
+
+def _wall_hugs(scene: dict) -> dict[str, tuple[str, float]]:
+    """Objects standing within HUG_DISTANCE_M of a wall: id -> (wall id, distance)."""
+    out: dict[str, tuple[str, float]] = {}
+    for obj in scene["objects"]:
+        if obj.get("mount") == "ceiling":
+            continue
+        fp = m.footprint(obj)
+        best = None
+        for wall in scene["room"]["walls"]:
+            a, b = m.wall_segment(scene, wall)
+            d = g.polygon_segment_distance(fp, a, b)
+            if best is None or d < best[1]:
+                best = (wall["id"], d)
+        if best is not None and best[1] <= HUG_DISTANCE_M:
+            out[obj["id"]] = best
+    return out
+
+
+def _restore_wall_hugs(scene: dict, hugs: dict[str, tuple[str, float]]) -> None:
+    walls = m.wall_map(scene)
+    for obj in scene["objects"]:
+        hug = hugs.get(obj["id"])
+        if not hug or hug[0] not in walls:
+            continue
+        a, b = m.wall_segment(scene, walls[hug[0]])
+        n = g.inward_normal(a, b)
+        # most outward corner measured along the wall's inward normal (negative = crossed the wall line)
+        signed = min(g.dot(g.sub(c, a), n) for c in m.footprint(obj))
+        shift = hug[1] - signed
+        obj["position_m"][0] = float(obj["position_m"][0]) + n[0] * shift
+        obj["position_m"][2] = float(obj["position_m"][2]) + n[1] * shift
 
 
 def _reference_value(scene: dict, kind: str, ident: str | None) -> float:
@@ -571,23 +631,35 @@ def _reference_value(scene: dict, kind: str, ident: str | None) -> float:
     return float(obj["dimensions_m"][idx])
 
 
-def _scale_scene(scene: dict, k: float) -> None:
+def _scale_scene(scene: dict, kx: float, kz: float, scale_dims: bool, scale_height: bool = False) -> None:
+    """Scale the room outline and positions by kx (along x) and kz (along z).
+    Opening offsets follow their wall's axis; opening widths and object sizes
+    change only when `scale_dims` (uniform, k = kx = kz); vertical values only
+    when `scale_height`."""
     room = scene["room"]
+    k = (kx + kz) / 2.0
     for v in room["vertices"]:
-        v["x"] = float(v["x"]) * k
-        v["z"] = float(v["z"]) * k
-    room["height_m"] = float(room["height_m"]) * k
+        v["x"] = float(v["x"]) * kx
+        v["z"] = float(v["z"]) * kz
+    if scale_height:
+        room["height_m"] = float(room["height_m"]) * k
     for o in room["openings"]:
-        for key in ("offset_m", "width_m", "height_m", "sill_m"):
-            o[key] = float(o[key]) * k
+        d = m.wall_direction(scene, o["wall_id"])
+        axis_k = abs(d[0]) * kx + abs(d[1]) * kz  # walls along x scale by kx, along z by kz
+        o["offset_m"] = float(o["offset_m"]) * axis_k
+        if scale_dims:
+            o["width_m"] = float(o["width_m"]) * k
+        if scale_height:
+            o["height_m"] = float(o["height_m"]) * k
+            o["sill_m"] = float(o["sill_m"]) * k
+        wall_len = m.wall_length(scene, o["wall_id"])
+        o["offset_m"] = max(0.0, min(float(o["offset_m"]), wall_len - float(o["width_m"])))
     for obj in scene["objects"]:
-        obj["position_m"] = [float(v) * k for v in obj["position_m"]]
+        x, y, z = (float(v) for v in obj["position_m"])
+        obj["position_m"] = [x * kx, y * k if scale_height else y, z * kz]
         src = (obj.get("provenance") or {}).get("dims_source", "estimated")
-        if src == "estimated":
+        if scale_dims and src == "estimated":
             obj["dimensions_m"] = [float(v) * k for v in obj["dimensions_m"]]
-    cal = scene.get("calibration") or {}
-    if cal.get("reference") and cal.get("status") == "calibrated":
-        pass
 
 
 # ---------------------------------------------------------------- outline upkeep

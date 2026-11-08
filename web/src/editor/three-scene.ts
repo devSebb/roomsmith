@@ -56,7 +56,7 @@ export class ObjectView {
     const [w, h, d] = obj.dimensions_m
     const geo = obj.shape === 'cylinder' ? new THREE.CylinderGeometry(Math.min(w, d) / 2, Math.min(w, d) / 2, h, 32) : new THREE.BoxGeometry(w, h, d)
     geo.translate(0, h / 2, 0)
-    const mat = new THREE.MeshStandardMaterial({ color: col(obj.color), roughness: 0.85, metalness: 0.0, transparent: true, opacity: 1 })
+    const mat = new THREE.MeshStandardMaterial({ color: col(obj.color), roughness: 0.85, metalness: 0.0, transparent: true, opacity: obj.mount === 'ceiling' ? 0.45 : 1 })
     this.mesh = new THREE.Mesh(geo, mat)
     this.mesh.castShadow = true
     this.mesh.receiveShadow = true
@@ -104,7 +104,7 @@ export class ObjectView {
     const m = this.mesh.material as THREE.MeshStandardMaterial
     m.emissive = new THREE.Color(0x000000)
     m.emissiveIntensity = 0
-    m.opacity = 1
+    m.opacity = this.obj.mount === 'ceiling' ? 0.45 : 1 // hanging things must not hide the room under them
     if (mode === 'selected') { m.emissive = col(theme.accent); m.emissiveIntensity = 0.35 }
     else if (mode === 'hover') { m.emissive = col(theme.accent); m.emissiveIntensity = 0.15 }
     else if (mode === 'bad') { m.emissive = col(theme.warn); m.emissiveIntensity = 0.6 }

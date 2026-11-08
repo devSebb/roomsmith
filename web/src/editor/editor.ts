@@ -42,6 +42,7 @@ export class Editor {
   alignToWall: boolean
   private room: RoomViews | null = null
   private roomKey = ''
+  private sizeKey = ''
   private objects = new Map<string, ObjectView>()
   private scene: Scene | null = null
   private issues: Issue[] = []
@@ -201,11 +202,23 @@ export class Editor {
     if (this.scene) { this.roomKey = ''; this.setScene(this.scene, this.issues, false) }
   }
 
+  /** Remove the room and every object (the room was deleted or none is open). */
+  clear() {
+    if (this.room) { this.scene3.remove(this.room.group); disposeGroup(this.room.group); this.room = null; this.roomKey = '' }
+    for (const [, v] of this.objects) { this.scene3.remove(v.group); v.dispose() }
+    this.objects.clear()
+    this.scene = null
+    this.render()
+  }
+
   setScene(scene: Scene, issues: Issue[], animate = true) {
     const first = !this.scene
     this.scene = scene
     this.issues = issues
     const key = JSON.stringify(scene.room) + this.theme.text
+    const sizeKey = JSON.stringify(scene.room.vertices) + '|' + (scene.project?.id ?? '')
+    const outlineChanged = sizeKey !== this.sizeKey
+    this.sizeKey = sizeKey
     if (key !== this.roomKey) {
       if (this.room) { this.scene3.remove(this.room.group); disposeGroup(this.room.group) }
       this.room = buildRoom(scene, this.theme)
@@ -232,7 +245,7 @@ export class Editor {
     for (const [id, v] of this.objects) if (!seen.has(id)) { this.scene3.remove(v.group); v.dispose(); this.objects.delete(id) }
     if (this.selected && !seen.has(this.selected)) this.select(null)
     for (const id of this.objects.keys()) this.applyHighlight(id)
-    if (first) this.frameRoom()
+    if (first || (outlineChanged && !this.drag)) this.frameRoom() // new room, or its walls moved (calibration, resize): re-frame
   }
 
   setLabels(on: boolean) {
@@ -254,10 +267,17 @@ export class Editor {
     if (!this.scene) return
     const xs = this.scene.room.vertices.map(v => v.x), zs = this.scene.room.vertices.map(v => v.z)
     const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2
-    const size = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs))
-    this.controls.target.set(cx, 0.6, cz)
-    // look from the front wall (+z) side, slightly to the right, like the camera that took the photo
-    this.persp.position.set(cx + size * 0.55, size * 0.9 + 1.5, cz + size * 1.25)
+    // fit the room's bounding sphere to the camera's field of view (whichever of the
+    // vertical/horizontal FOV is tighter for this viewport), looking from the front
+    // wall (+z) side and slightly to the right, like the camera that took the photo
+    const w = Math.max(...xs) - Math.min(...xs), d = Math.max(...zs) - Math.min(...zs), h = this.scene.room.height_m
+    const radius = 0.5 * Math.hypot(w, h, d)
+    const vfov = (this.persp.fov * Math.PI) / 180
+    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * this.persp.aspect)
+    const dist = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * 1.08
+    const dir = new THREE.Vector3(0.55, 0.75, 1.25).normalize()
+    this.controls.target.set(cx, h * 0.35, cz)
+    this.persp.position.set(cx + dir.x * dist, h * 0.35 + dir.y * dist, cz + dir.z * dist)
     this.ortho.position.set(cx, 20, cz)
     this.ortho.lookAt(cx, 0, cz)
     this.ortho.up.set(0, 0, -1)

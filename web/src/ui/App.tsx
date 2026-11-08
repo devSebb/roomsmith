@@ -45,6 +45,7 @@ export function App(props: AppProps) {
   const [drag, setDrag] = React.useState<{ on: boolean; snapped: string | null; bad: boolean }>({ on: false, snapped: null, bad: false })
   const [tab, setTab] = React.useState<'room' | 'objects' | 'issues' | 'history' | 'add'>('objects')
   const [narrow, setNarrow] = React.useState(false)
+  React.useLayoutEffect(() => { setNarrow((rootRef.current?.clientWidth || 1000) < 640) }, []) // decide the layout before first paint
 
   React.useEffect(() => { props.onStateChange?.(s) }, [s])
 
@@ -72,6 +73,7 @@ export function App(props: AppProps) {
     editorRef.current = ed
     store.onFlash = ids => ed.flash(ids)
     if (props.shell === 'dev') (window as any).__rs = { editor: ed, store }
+    if (rootRef.current) (rootRef.current as any).__rs = { editor: ed, store } // for the Desktop smoke script
     const ro = new ResizeObserver(() => setNarrow((rootRef.current?.clientWidth || 1000) < 640))
     if (rootRef.current) ro.observe(rootRef.current)
     const mo = new MutationObserver(() => ed.setTheme(readTheme(rootRef.current || el)))
@@ -79,7 +81,7 @@ export function App(props: AppProps) {
     return () => { ro.disconnect(); mo.disconnect(); ed.dispose(); editorRef.current = null }
   }, [])
 
-  React.useEffect(() => { if (s.scene && editorRef.current) editorRef.current.setScene(s.scene, s.issues, true) }, [s.scene, s.issues])
+  React.useEffect(() => { if (editorRef.current) { if (s.scene) editorRef.current.setScene(s.scene, s.issues, true); else editorRef.current.clear() } }, [s.scene, s.issues])
   React.useEffect(() => { editorRef.current?.select(s.selectedId, false) }, [s.selectedId])
 
   const ed = editorRef.current
@@ -302,6 +304,8 @@ function RoomPanel({ store, scene, opening, wallId, api, openExternal }: { store
   React.useEffect(() => setName(scene.project.name), [scene.project.name])
   const [calWall, setCalWall] = React.useState(scene.room.walls[0]?.id || 'w1')
   const [calLen, setCalLen] = React.useState('')
+  const [calW, setCalW] = React.useState('')
+  const [calD, setCalD] = React.useState('')
   const wall: Wall | undefined = scene.room.walls.find(w => w.id === wallId)
   return (
     <div className="rs-sec">
@@ -343,7 +347,9 @@ function RoomPanel({ store, scene, opening, wallId, api, openExternal }: { store
       <h4>Scale</h4>
       {scene.calibration.status === 'calibrated' ? <div className="rs-badge ok">Calibrated</div> : (
         <div className="rs-sec">
-          <div className="rs-faint">Sizes are estimates. Give one real length and everything rescales.</div>
+          <div className="rs-faint">Sizes are estimates. Best: the room's real floor size (width × depth) — furniture keeps its size and stays on its walls.</div>
+          <div className="rs-row rs-3"><input className="rs-in num" placeholder="width m" value={calW} onChange={e => setCalW(e.target.value)} /><input className="rs-in num" placeholder="depth m" value={calD} onChange={e => setCalD(e.target.value)} /><button className="rs-btn sm primary" onClick={() => { const w = parseFloat(calW), d = parseFloat(calD); if (w > 0 && d > 0) store.apply([{ op: 'calibrate', reference: { kind: 'room_size', width_m: w, depth_m: d } }]) }}>Fit room</button></div>
+          <div className="rs-faint">Or one real wall length:</div>
           <div className="rs-row"><select className="rs-sel" value={calWall} onChange={e => setCalWall(e.target.value)}>{scene.room.walls.map(w => <option key={w.id} value={w.id}>{w.id} {w.label}</option>)}</select><input className="rs-in num" placeholder="m" value={calLen} onChange={e => setCalLen(e.target.value)} /><button className="rs-btn sm primary" onClick={() => { const v = parseFloat(calLen); if (v > 0) store.apply([{ op: 'calibrate', reference: { kind: 'wall_length', id: calWall, real_m: v } }]) }}>Set</button></div>
         </div>
       )}

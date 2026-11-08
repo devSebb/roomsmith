@@ -202,7 +202,7 @@ def build_scene(project_id: str, name: str, draft: dict | None, notes: list[str]
         placed.append(obj)
         scene["objects"].append(obj)
 
-    moved = _nudge_apart(scene)
+    moved = nudge_apart(scene)
     if moved:
         notes.append("Nudged apart: " + ", ".join(moved) + ".")
     for o in scene["objects"]:
@@ -303,11 +303,36 @@ def _keep_inside(scene: dict, obj: dict) -> None:
         obj["position_m"][2] += dz
 
 
-def _nudge_apart(scene: dict, rounds: int = 12) -> list[str]:
-    """Push overlapping floor objects apart along the wall they sit against
-    (or along their own right axis). Small, deterministic, never perfect."""
-    floor = [o for o in scene["objects"] if o.get("mount", "floor") == "floor" and o.get("category") != "rug"]
+def nudge_apart(scene: dict, rounds: int = 12) -> list[str]:
+    """Push overlapping floor objects apart along their own right axis (along the
+    wall they sit against). The smaller one moves first; if a wall stops it, the
+    larger one gives way. Things sitting on a moved object ride along. Small,
+    deterministic, never perfect."""
+    floor = [o for o in scene["objects"] if o.get("mount", "floor") == "floor" and o.get("category") != "rug" and float(o["position_m"][1]) < 1.9]
+    riders = [o for o in scene["objects"] if o.get("mount") == "surface"]
     moved: set[str] = set()
+
+    def slide(obj: dict, away_from: dict, amount: float) -> bool:
+        before = (obj["position_m"][0], obj["position_m"][2])
+        r = g.right_vector(float(obj.get("yaw_rad", 0.0)))
+        toward = g.sub(before, (away_from["position_m"][0], away_from["position_m"][2]))
+        sign = 1.0 if g.dot(r, toward) >= 0 else -1.0
+        step = g.scale(r, sign * amount)
+        host_fp = m.footprint(obj)
+        obj["position_m"][0] += step[0]
+        obj["position_m"][2] += step[1]
+        _keep_inside(scene, obj)
+        dx, dz = obj["position_m"][0] - before[0], obj["position_m"][2] - before[1]
+        if abs(dx) < 1e-9 and abs(dz) < 1e-9:
+            return False
+        top = m.object_top(obj)
+        for rd in riders:  # carry what sits on it: centre over the footprint, resting at its top
+            if abs(float(rd["position_m"][1]) - top) < 0.02 and g.point_in_polygon((rd["position_m"][0], rd["position_m"][2]), host_fp):
+                rd["position_m"][0] += dx
+                rd["position_m"][2] += dz
+        moved.add(f"{obj['name']} ({obj['id']})")
+        return True
+
     for _ in range(rounds):
         any_move = False
         for i in range(len(floor)):
@@ -316,17 +341,12 @@ def _nudge_apart(scene: dict, rounds: int = 12) -> list[str]:
                 depth = g.convex_overlap_depth(m.footprint(a), m.footprint(b))
                 if depth <= 0.01:
                     continue
-                # move the smaller one, along its own right vector, away from the other
                 mover, anchor = (a, b) if _area(a) <= _area(b) else (b, a)
-                r = g.right_vector(float(mover.get("yaw_rad", 0.0)))
-                toward = g.sub((mover["position_m"][0], mover["position_m"][2]), (anchor["position_m"][0], anchor["position_m"][2]))
-                sign = 1.0 if g.dot(r, toward) >= 0 else -1.0
-                step = g.scale(r, sign * (depth + 0.03))
-                mover["position_m"][0] += step[0]
-                mover["position_m"][2] += step[1]
-                _keep_inside(scene, mover)
-                moved.add(f"{mover['name']} ({mover['id']})")
-                any_move = True
+                if slide(mover, anchor, depth + 0.03):
+                    any_move = True
+                remaining = g.convex_overlap_depth(m.footprint(a), m.footprint(b))
+                if remaining > 0.01 and slide(anchor, mover, remaining + 0.03):  # the wall stopped the small one
+                    any_move = True
         if not any_move:
             break
     return sorted(moved)
@@ -427,6 +447,7 @@ DRAFT_JSON_SCHEMA_SMALL: dict = {
 DRAFT_INSTRUCTIONS = """You are measuring a room from one or more photos for a 3D planner.
 Return only the JSON described by the schema. Think in metres.
 Use known sizes as anchors: an interior door is about 0.8 m wide and 2.03 m tall; a kitchen counter is about 0.9 m high; a sofa seat is about 0.45 m high; a standard ceiling is 2.4 to 2.7 m.
+Phone photos are wide-angle and make rooms look much deeper than they are: estimate the room's depth from the furniture along the side walls (how many sofa-lengths or door-widths the wall holds), not from how far away the back wall looks. Prefer underestimating depth.
 Walls are named from the camera's point of view: 'back' is the wall the camera faces, 'left' and 'right' are the side walls, 'front' is behind the camera. Give every piece of furniture you can see with a short label, a category from the list, estimated width (across its front), height and depth, which wall it stands against ('none' if free-standing), its centre as fractions across the room (0 = left wall, 1 = right wall) and into the room (0 = back wall, 1 = camera), and which wall its front faces.
 Say how each thing is mounted: 'floor' for furniture standing on the floor, 'surface' for things sitting on other furniture (a plant on a table), 'wall' for things fixed to a wall (pictures, mirrors, wall-mounted TVs, shelves) and 'ceiling' for things hanging from the ceiling (pendant lights, fans); give elevation_m, the height of its lowest point above the floor. Pictures leaning on the floor are 'floor'.
 List doors and windows with the wall they are on and their centre as a fraction along that wall (0 at the wall's left end as seen from inside, 1 at its right end).

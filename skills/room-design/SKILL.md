@@ -49,10 +49,14 @@ numbered revision with undo.
   anchors: a door is about 0.8 x 2.03 m, a counter 0.9 m high, a sofa seat
   0.45 m high. Name walls from the camera: back / left / right / front.
 - **The user gives a file path** → `roomsmith_from_photo` with the path.
-- Either photo route produces **estimated** sizes. Then ask for ONE real
-  measurement (a wall length or the door width) and apply
+- Either photo route produces **estimated** sizes. Then ask for the room's real
+  floor size (best) or ONE real length, and apply
+  `{"op": "calibrate", "reference": {"kind": "room_size", "width_m": 2.85, "depth_m": 3.0}}`
+  (fits width and depth separately — phone photos stretch depth; furniture keeps
+  its size and stays against its walls) or
   `{"op": "calibrate", "reference": {"kind": "wall_length", "id": "w1", "real_m": 4.2}}`.
-  Until then every reply should say sizes are estimates.
+  Until then every reply should say sizes are estimates. Draft issues (blocked
+  door etc.) come from estimated positions — mention them, ask before moving things.
 
 ## Products from links
 

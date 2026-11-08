@@ -2,7 +2,9 @@ import math
 
 import pytest
 
+from rs_core import geometry as g
 from rs_core import model as m
+from rs_core import validate
 from rs_core import ops
 from rs_core.model import SceneError
 
@@ -160,9 +162,47 @@ def test_calibrate_scales_estimated_only():
     assert abs(m.wall_length(r.scene, "w1") - 8.0) < 1e-9
     assert abs(m.wall_length(r.scene, "w2") - 10.0) < 1e-9
     sofa, prod = r.scene["objects"]
-    assert abs(sofa["dimensions_m"][0] - 4.0) < 1e-9  # estimated: scaled x2
+    assert abs(sofa["dimensions_m"][0] - 2.0) < 1e-9  # a wall measurement keeps furniture sizes
     assert prod["dimensions_m"] == [1.0, 1.0, 1.0]  # stated: unchanged
     assert prod["position_m"] == [4.0, 0.0, 4.0]  # position scaled
+    # the sofa stood against w1 and still does
+    a, b = m.wall_segment(r.scene, "w1")
+    assert g.polygon_segment_distance(m.footprint(sofa), a, b) < 0.03
+    # an object measurement scales everything estimated (the model's overall scale was off)
+    r2 = apply(r.scene, {"op": "calibrate", "reference": {"kind": "object_width", "id": "ob1", "real_m": 2.4}})
+    assert abs(r2.scene["objects"][0]["dimensions_m"][0] - 2.4) < 1e-9
+    assert abs(m.wall_length(r2.scene, "w1") - 9.6) < 1e-9
+
+
+def test_calibrate_room_size_scales_axes_independently_and_keeps_wall_contact():
+    """The first real photo: model said 2.65 x 4.4 m, the room is 2.85 x 3.0 m (wide-angle
+    depth stretch). Furniture sizes were right and must survive; the sofa stays on its wall."""
+    s = m.new_scene("p", "Photo", 2.65, 4.4, 2.7)
+    s["calibration"] = {"status": "uncalibrated", "reference": None}
+    s["room"]["openings"].append(m.make_opening(s, "w1", "door", 0.63, 1.55, 2.1, 0.0, dims_source="estimated"))
+    r = apply(
+        s,
+        {"op": "add_object", "name": "Sofa", "category": "sofa", "dimensions_m": [2.0, 0.82, 0.88], "place": {"against_wall": "right", "align": "center"}},
+        {"op": "add_object", "name": "Table", "category": "table_side", "dimensions_m": [0.4, 0.58, 0.36], "place": {"position_m": [1.3, 0, 2.2]}},
+    )
+    for o in r.scene["objects"]:
+        o["provenance"]["dims_source"] = "estimated"
+    r = apply(r.scene, {"op": "calibrate", "reference": {"kind": "room_size", "width_m": 2.85, "depth_m": 3.0}})
+    sc = r.scene
+    assert sc["calibration"]["status"] == "calibrated"
+    w, d = m.room_size(sc)
+    assert abs(w - 2.85) < 1e-9 and abs(d - 3.0) < 1e-9
+    sofa, table = sc["objects"]
+    assert sofa["dimensions_m"] == [2.0, 0.82, 0.88]  # kept
+    a, b = m.wall_segment(sc, "w2")
+    assert g.polygon_segment_distance(m.footprint(sofa), a, b) < 0.03  # still against the right wall
+    assert abs(sofa["position_m"][2] - 1.5) < 1e-6  # centred along the (now 3 m) wall
+    assert abs(table["position_m"][0] - 1.3 * 2.85 / 2.65) < 1e-9 and abs(table["position_m"][2] - 2.2 * 3.0 / 4.4) < 1e-9
+    door = sc["room"]["openings"][0]
+    assert abs(door["width_m"] - 1.55) < 1e-9  # door width kept, offset scaled along its wall
+    assert abs(door["offset_m"] - 0.63 * 2.85 / 2.65) < 1e-9
+    assert sc["room"]["height_m"] == 2.7
+    validate.validate_hard(sc)
 
 
 def test_duplicate_swap_remove():

@@ -69,3 +69,27 @@ test('switching rooms by hand restarts the long-poll for the new room', async ()
   assert.equal(store.state.revision, 1)
   store.dispose()
 })
+
+test('when the shown room is deleted the editor moves to the active room', async () => {
+  const { api, st } = fakeApi()
+  // room a will vanish; b is active afterwards
+  const origScene = api.scene
+  const origWait = api.wait
+  let deleted = false
+  api.scene = async (id) => { if (deleted && id === 'a') { const e = new Error('gone'); e.code = 'not_found'; throw e } return origScene(id) }
+  api.listProjects = async () => ({ ok: true, active_project_id: deleted ? 'b' : 'a', projects: (deleted ? ['b'] : ['a', 'b']).map(id => ({ project_id: id, name: id === 'a' ? 'Living room' : 'Room from photo', revision: 1, active: id === 'b' })) })
+  api.wait = (id, after, timeout, active) => new Promise((res, rej) => { st.waits.push({ id, resolve: res, reject: rej }) })
+  const store = new Store(api)
+  await store.boot(); await tick()
+  assert.equal(store.state.projectId, 'a')
+  deleted = true
+  const err = new Error('gone'); err.code = 'not_found'
+  // ApiError check uses instanceof; emulate by rejecting with an error the store recognises
+  const mod = await import(out)
+  const apiErr = new mod.ApiError('not_found', 'gone', {})
+  st.waits[0].reject(apiErr); await tick(); await tick()
+  assert.equal(store.state.projectId, 'b')
+  assert.ok(store.state.toasts.some(t => /deleted/.test(t.text)))
+  assert.equal(st.waits.length, 2, 'polling continues on room b')
+  store.dispose()
+})

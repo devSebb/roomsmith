@@ -67,8 +67,9 @@ def test_demo_script_end_to_end(demo):
     insp = call("roomsmith_inspect")
     assert insp["room"]["width_m"] == pytest.approx(4.6, abs=1e-6)
     assert "calibrated" in insp["text"] and "uncalibrated" not in insp["text"]
-    scale = 4.6 / 4.2
-    assert _by_name(insp["objects"], "Grey sofa")["dimensions_m"][0] == pytest.approx(sofa_w_est * scale, abs=1e-6)
+    # a wall measurement corrects the room and positions; furniture keeps the sizes the model anchored on known objects
+    assert _by_name(insp["objects"], "Grey sofa")["dimensions_m"][0] == pytest.approx(sofa_w_est, abs=1e-6)
+    assert _by_name(insp["objects"], "Grey sofa")["nearest_wall"]["distance_m"] < 0.03  # still against its wall
     rev = insp["revision"]
 
     # 22–40 s  "Swap the sofa and the coffee table, and put the bookshelf against the window wall."

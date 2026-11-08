@@ -165,3 +165,21 @@ def test_draft_notes_are_clipped_at_a_word():
     scene, notes = layout.build_scene("p", "N", {"room": {"width_m": 3, "depth_m": 3}, "objects": [], "notes": long})
     clipped = notes[-1]
     assert clipped.endswith("…") and len(clipped) <= 501 and not clipped.endswith("wor…")
+
+
+def test_nudge_apart_lets_the_larger_object_give_way_and_carries_riders():
+    """Calibrating the first real photo compressed depth and pushed the side table
+    into the sofa; the table was already against the back wall, so the sofa must
+    move, and the plant on the table must stay on the table."""
+    from rs_core import model as m
+
+    s = m.new_scene("p", "R", 2.85, 3.0, 2.7)
+    sofa = m.make_object(s, "Sofa", "sofa", (2.0, 0.82, 0.88)); sofa["position_m"] = [2.39, 0.0, 1.2]; sofa["yaw_rad"] = 1.5707963
+    table = m.make_object(s, "Table", "table_side", (0.4, 0.58, 0.36)); table["position_m"] = [2.25, 0.0, 0.36]; table["yaw_rad"] = 1.5707963
+    plant = m.make_object(s, "Plant", "plant", (0.25, 0.3, 0.23), mount="surface"); plant["position_m"] = [2.22, 0.58, 0.36]
+    s["objects"] += [sofa, table, plant]
+    moved = layout.nudge_apart(s)
+    assert "Sofa (ob1)" in moved and "Table (ob2)" in moved
+    assert not [i for i in validate.issues(s) if i["code"] == "overlap"], validate.issues(s)
+    assert abs(plant["position_m"][2] - table["position_m"][2]) < 1e-6  # rode with the table, not the sofa
+    assert plant["position_m"][1] == 0.58

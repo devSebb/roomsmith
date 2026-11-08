@@ -3,6 +3,7 @@
 // React subscribes through `subscribe`.
 
 import { Api, ApiError } from './api'
+export { ApiError } // so tests against the bundled store can raise the same class
 import type { Head, Issue, Op, ProjectRow, Revision, Scene } from './types'
 
 export interface Toast { id: number; kind: 'info' | 'warn' | 'error' | 'agent'; text: string; ids?: string[] }
@@ -132,7 +133,15 @@ export class Store {
         else if (!h.changed) void this.refreshProjects() // idle tick: keep the room list current (renames/deletes elsewhere)
       } catch (e: any) {
         if (token !== this.pollAbort) break
-        if (e instanceof ApiError && e.code === 'not_found') { this.set({ error: 'This room was deleted.', scene: null, projectId: null }); break }
+        if (e instanceof ApiError && e.code === 'not_found') {
+          // the room we were showing is gone: move to whatever is active now, else a clean empty state
+          const r = await this.refreshProjects()
+          const next = r?.projects.find(p => p.project_id !== pid && p.project_id === r.active_project_id)?.project_id || r?.projects.find(p => p.project_id !== pid)?.project_id || null
+          this.toast('info', 'That room was deleted' + (next ? '; opened the current room.' : '.'))
+          if (next) { await this.open(next); return }
+          this.set({ error: null, scene: null, projectId: null, revision: 0, issues: [], history: [] })
+          break
+        }
         // A proxy that buffers or times out long requests (the Hermes plugin host, an SSH
         // forward) shows up as repeated failures: shorten the wait window so we stay live.
         this.waitSeconds = Math.max(4, Math.floor(this.waitSeconds / 2))

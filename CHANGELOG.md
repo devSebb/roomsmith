@@ -48,6 +48,21 @@ Built 2026-11-07, hackathon week.
   `next_step` tells the agent to review draft issues with the user, not fix them
   blindly. S1 chat smoke passed on the Mini; `--image` is rejected by the gateway
   CLI (S6 blocked there; path route works).
+- Calibration rethought after the first ground truth (Sebb's room is 2.85 × 3.0 m;
+  the photo read said 2.65 × 4.4 — width 7 % off, depth 47 % over, the wide-angle
+  stretch): new `calibrate {kind: 'room_size', width_m, depth_m}` fits each axis
+  separately, keeps furniture sizes, keeps things against their walls and nudges
+  apart what the compression pushed together (the larger piece gives way when the
+  smaller is already on a wall; things on tables ride along). Wall/height/opening
+  references now also keep furniture sizes; object references still scale
+  everything estimated. Editor Room tab: "Fit room" (width × depth) first, one
+  wall length second. Photo instructions: estimate depth from furniture along the
+  side walls, not from how far the back wall looks.
+- Editor: when the shown room is deleted it moves to the active room instead of
+  dead-ending; the 3D scene clears when none is open; the camera re-frames when
+  the walls move (fit to the room's bounding sphere and the viewport's FOV);
+  ceiling-mounted objects render translucent; layout mode decided before first
+  paint; the editor instance is exposed on `.rs-root.__rs` for the smoke script.
 - `web/dev/desktop-attach.mjs` + `web/dev/desktop-smoke.mjs`: the Desktop checklist
   as a script (sidebar entry, pane + WebGL, ctx.rest, status chip, full page, New
   room, editor follows an agent-created room, undo). `scripts/pin-catalog.py`

@@ -132,8 +132,8 @@ APPLY = {
         "- set_surface_color {surface: 'floor'|'ceiling'|'walls'|wall id, color: '#rrggbb'}\n"
         "- add_opening {wall: id or label ('front'), kind: 'door'|'window'|'opening', width_m? (door 0.9, window 1.2), offset_m | position_fraction (0..1 along the wall), height_m?, sill_m?, swing?, hinge?}\n"
         "- update_opening {id, ...same fields} | remove_opening {id}\n"
-        "- calibrate {reference: {kind: 'wall_length'|'room_height'|'opening_width'|'object_width'|'object_height'|'object_depth', id, real_m}} "
-        "rescales everything estimated so that one known length is exact.\n"
+        "- calibrate {reference: {kind: 'room_size', width_m, depth_m}} fits the room to its real floor size (each axis separately — photos stretch depth more than width), keeps furniture sizes, keeps things against their walls. PREFER this when the user knows the room's size. "
+        "Or {reference: {kind: 'wall_length'|'room_height'|'opening_width', id, real_m}} (room + positions; furniture sizes kept) or {kind: 'object_width'|'object_height'|'object_depth', id, real_m} (scales everything estimated).\n"
         "Returns what changed, the new revision, and any issues the change caused (overlap, outside_room, blocks_door, blocks_window, tight_walkway, too_tall)."
     ),
     "parameters": {
