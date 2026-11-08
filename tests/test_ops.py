@@ -128,6 +128,18 @@ def test_openings_validation():
     assert e.value.code == "opening_too_tall"
 
 
+def test_add_opening_accepts_wall_label_and_default_width():
+    # The model usually says "a door on the front wall" — no id, no width.
+    r = apply(scene(), {"op": "add_opening", "wall": "front", "kind": "door", "position_fraction": 0.3})
+    o = r.scene["room"]["openings"][0]
+    assert o["wall_id"] == "w3" and o["width_m"] == 0.9
+    assert o["offset_m"] == pytest.approx(0.3 * 4.0 - 0.45)
+    r = apply(r.scene, {"op": "add_opening", "wall": "left", "kind": "window"})
+    w = r.scene["room"]["openings"][1]
+    assert w["wall_id"] == "w4" and w["width_m"] == 1.2 and w["sill_m"] == 0.9
+    assert w["offset_m"] == pytest.approx((5.0 - 1.2) / 2)  # centred on the wall
+
+
 def test_set_wall_length_shorter_clamps_openings():
     s = scene()
     r = apply(s, {"op": "add_opening", "wall_id": "w1", "kind": "window", "offset_m": 2.5, "width_m": 1.2})

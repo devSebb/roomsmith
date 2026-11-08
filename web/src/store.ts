@@ -98,23 +98,30 @@ export class Store {
     try { const h = await this.api.history(this.state.projectId, 30); this.set({ history: h.revisions, canUndo: h.can_undo, canRedo: h.can_redo }) } catch { /* ignore */ }
   }
 
+  /** Long-poll window in seconds; adapts downward when the transport cuts long requests. */
+  private waitSeconds = 20
+
   private async startPolling() {
     if (this.polling) return
     this.polling = true
     const token = ++this.pollAbort
     let backoff = 1000
+    let failures = 0
     while (!this.disposed && token === this.pollAbort && this.state.projectId) {
       const pid = this.state.projectId
       try {
-        const h = await this.api.wait(pid, this.state.revision, 25)
+        const h = await this.api.wait(pid, this.state.revision, this.waitSeconds)
         if (token !== this.pollAbort) break
-        backoff = 1000
+        backoff = 1000; failures = 0
         if (!this.state.online) this.set({ online: true, error: null })
         if (h.changed && h.revision > this.state.revision && this.pending === 0) await this.pull(h)
       } catch (e: any) {
         if (token !== this.pollAbort) break
         if (e instanceof ApiError && e.code === 'not_found') { this.set({ error: 'This room was deleted.', scene: null, projectId: null }); break }
-        this.set({ online: false })
+        // A proxy that buffers or times out long requests (the Hermes plugin host, an SSH
+        // forward) shows up as repeated failures: shorten the wait window so we stay live.
+        this.waitSeconds = Math.max(4, Math.floor(this.waitSeconds / 2))
+        if (++failures >= 2) this.set({ online: false })
         await sleep(backoff)
         backoff = Math.min(backoff * 2, 15000)
       }

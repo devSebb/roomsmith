@@ -17,8 +17,8 @@ actually uses — not whichever version a particular machine runs.
 | Dashboard `dashboard/manifest.json` (`name`, `label`, `icon`, `version`, `tab.path`, `tab.position`, `entry`, `api`) | dashboard tab | 0.21.0 (docs) | 0.21.0 live (`hermes dashboard`) | gated on `plugins.enabled` |
 | Dashboard `plugin_api.py` exporting FastAPI `router`, mounted at `/api/plugins/<name>/`, imported standalone | backend | 0.21.0 | 0.21.0 live | no relative imports; behind the dashboard's auth |
 | Dashboard JS SDK: `window.__HERMES_PLUGIN_SDK__.React`, `SDK.fetchJSON`, `window.__HERMES_PLUGINS__.register(name, Component)`, `window.__HERMES_SESSION_TOKEN__` + `X-Hermes-Session-Token` | `web/src/dashboard.tsx` | 0.21.0 | 0.21.0 live | `fetchJSON` throws `Error("<status>: <body>")` on non-2xx; we parse the body back |
-| Desktop SDK (`@hermes/plugin-sdk`): `host.notify`, `host.navigate`, `atom`, `useValue`, `PANES_AREA`, `ROUTES_AREA`, `SIDEBAR_NAV_AREA`, `STATUSBAR_AREAS`, `PALETTE_AREA`; `ctx.registerMany`, `ctx.rest(path, {method, body, upload, timeoutMs})`, `ctx.storage.get/set`, `ctx.os.openExternal` | `web/src/desktop.tsx` | 0.21.0 (docs) | **not yet run live** (spike S4 in Desktop) | single uncompiled ESM file; only three import specifiers resolve |
-| Catalog validator (`hermes plugins validate`, main only): manifest + SemVer floor, capability probe with a methods-only stub, security scan (≤400 files, ≤10 MB, ≤1 MB/file), Desktop-surface lint, private-imports warning | repo layout, build | main (0.23.x) | **mirrored** in `web/build.mjs`; authoritative run pending (spike S7) | |
+| Desktop SDK (`@hermes/plugin-sdk`): `host.notify`, `host.navigate`, `atom`, `useValue`, `PANES_AREA`, `ROUTES_AREA`, `SIDEBAR_NAV_AREA`, `STATUSBAR_AREAS`, `PALETTE_AREA`; `ctx.registerMany`, `ctx.rest(path, {method, body, upload, timeoutMs})`, `ctx.storage.get/set`, `ctx.os.openExternal` | `web/src/desktop.tsx` | 0.21.0 (docs) | 0.21.0 (+37159) Desktop live, 2026-11-08 | single uncompiled ESM file; only three import specifiers resolve. Pane, sidebar nav, status chip, palette and `ctx.rest` (incl. auth) all work. **`ROUTES_AREA` page does not mount in this build** — the bundled Kanban plugin's page is affected identically, so this is host-side; the pane is the primary surface and the page is progressive enhancement |
+| Catalog validator (`hermes plugins validate`, main only): manifest + SemVer floor, capability probe with a methods-only stub, security scan (≤400 files, ≤10 MB, ≤1 MB/file), Desktop-surface lint, private-imports warning | repo layout, build | main (0.23.x) | **passed on the Mini**, Hermes 0.23.0+689 (a9ff9799), commit 0bf14fc, 2026-11-08 | `validate` takes a **directory**, not a plugin name. It reports `Isolation — runs in the plugin host (plugins.isolation: host)` and `dashboard backend API is served through the plugin host (buffered responses)`: on 0.23 our API is proxied; the long-poll `wait` is a plain buffered JSON reply and the editor shortens its wait window on repeated transport failures |
 
 ## Python
 
@@ -30,8 +30,8 @@ actually uses — not whichever version a particular machine runs.
 
 | Machine | Hermes | Python | Role |
 |---|---|---|---|
-| MacBook (dev) | 0.21.0 (`~/.hermes/hermes-agent`, unused install) | 3.11 / 3.14 | all code; lower-bound runtime checks in an isolated `HERMES_HOME` (`.scratch/hermes-home`) |
-| Mac mini (production) | 0.21.5+5263.g895b506 **dirty** git install, upstream a9ff9799 | 3.14.7 | runtime tests only in an approved isolated home; never the live `~/.hermes` |
+| MacBook (dev) | 0.21.0 (`~/.hermes/hermes-agent`, unused install; Desktop build +37159) | 3.11 / 3.14 | all code; lower-bound runtime checks in an isolated `HERMES_HOME` (session scratchpad `hermes-home/`). Desktop is run isolated with `HERMES_HOME=<isolated> HERMES_DESKTOP_USER_DATA_DIR=<isolated userData> HERMES_DESKTOP_HERMES_ROOT=~/.hermes/hermes-agent hermes desktop --skip-build`; `desktop.electron_flags: [--remote-debugging-port=9333]` in the isolated config lets a CDP script drive the UI |
+| Mac mini (production) | live: 0.21.5+5263.g895b506 **dirty** git install; test env `/Users/jessica/room-studio-test/` checkout a9ff9799 = **0.23.0+689**, Pillow 13.0.0 | 3.14.7 | runtime tests only in the approved isolated home through `run-isolated.py`; never the live `~/.hermes`. Roomsmith 0bf14fc installed there via `hermes plugins install devSebb/roomsmith --ref …` |
 | Judges (assumed) | latest release, 0.23.0 on 2026-11-05 | — | catalog `validate` + clean install |
 
 ## Spike log (M0)
@@ -39,10 +39,10 @@ actually uses — not whichever version a particular machine runs.
 | Spike | Result | Date |
 |---|---|---|
 | S0 Mini reachable | passed (read-only SSH as `jessica`) | 2026-11-07 |
-| S1 skeleton loads | passed on 0.21.0: `hermes plugins doctor --ci` OK; dashboard tab + backend live in an isolated home | 2026-11-07 |
+| S1 skeleton loads | passed on 0.21.0: `hermes plugins doctor --ci` OK; dashboard tab + backend live in an isolated home. Mini (0.23.0+689): install + doctor passed; chat turn blocked until the test home has Codex OAuth | 2026-11-08 |
 | S2 `ctx.llm` with an image on GPT astra | pending (needs the Mini test home) | |
 | S3 photo draft quality | pending (needs photos) | |
-| S4 bundled three.js in Desktop | half: both bundles 593 KB, lint clean by mirror, dashboard shell renders in the real dashboard; Desktop app run pending | 2026-11-07 |
-| S5 tool write reaches the pane | passed: agent-actor commands appear in the editor within ~1 s with a toast and flash (long-poll) | 2026-11-07 |
+| S4 bundled three.js in Desktop | **passed**: Hermes Desktop 0.21.0 (+37159) on the MacBook, fully isolated launch; plugin discovered under Settings → Plugins ("Roomsmith · on disk" + agent plugin "roomsmith · git"), pane renders the WebGL room, `ctx.rest` works behind auth, status chip and sidebar entry present; 593 KB; `validate`'s desktop-surface lint passed on the Mini. Route page does not mount in this build (host-side, Kanban identical) | 2026-11-08 |
+| S5 tool write reaches the pane | passed in the dashboard (7 Nov) and **in Hermes Desktop** (8 Nov): `roomsmith_apply` against the backend's DB shows in the pane within ~2 s with a toast | 2026-11-08 |
 | S6 attached photo → tool | pending; Route B (`new_room` with `layout`) implemented and tested as the path that needs nothing | |
-| S7 `hermes plugins validate` | pending (throwaway 0.23.0) | |
+| S7 `hermes plugins validate` | **passed** on the Mini test checkout (0.23.0+689) at 0bf14fc: all 16 checks ✓ incl. security scan, no core override, desktop surface. Also `doctor --ci` OK (9 tools, 1 hook). Run by Harvey; full output in `ROOMSMITH_MINI_SPIKE_RESULTS.md` | 2026-11-08 |

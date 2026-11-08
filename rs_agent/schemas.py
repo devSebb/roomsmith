@@ -129,7 +129,7 @@ APPLY = {
         "- update_object {id, name?, category?, color?, locked?} | duplicate_object {id, place?} | remove_object {id} | swap_objects {a, b}\n"
         "- set_room_rectangle {width_m, depth_m} | set_room_height {height_m} | set_wall_length {id, length_m} | move_vertex {id, x?, z?, by?}\n"
         "- set_surface_color {surface: 'floor'|'ceiling'|'walls'|wall id, color: '#rrggbb'}\n"
-        "- add_opening {wall_id, kind: 'door'|'window'|'opening', width_m, offset_m | position_fraction, height_m?, sill_m?, swing?, hinge?}\n"
+        "- add_opening {wall: id or label ('front'), kind: 'door'|'window'|'opening', width_m? (door 0.9, window 1.2), offset_m | position_fraction (0..1 along the wall), height_m?, sill_m?, swing?, hinge?}\n"
         "- update_opening {id, ...same fields} | remove_opening {id}\n"
         "- calibrate {reference: {kind: 'wall_length'|'room_height'|'opening_width'|'object_width'|'object_height'|'object_depth', id, real_m}} "
         "rescales everything estimated so that one known length is exact.\n"

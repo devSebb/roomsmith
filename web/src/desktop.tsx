@@ -104,6 +104,7 @@ export default {
       {
         id: 'page',
         area: ROUTES_AREA,
+        title: 'Roomsmith',
         data: { path: '/roomsmith' },
         render: () => React.createElement(Roomsmith, { ctx, full: true }),
       },

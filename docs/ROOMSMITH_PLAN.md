@@ -100,7 +100,7 @@ Consequences that shape the design:
 | `ctx.register_hook("pre_llm_call", …)` | Tell the agent, in the current turn only, what the user changed by hand since the agent last looked | Verified |
 | `plugins.plugin_storage.plugin_data_dir` / `plugin_db` | Durable data at `~/.hermes/plugin-data/roomsmith/` (SQLite in WAL mode, built for one reader and one writer in different processes). Survives plugin update and removal | Verified; listed in the public plugin API |
 | Backend router at `/api/plugins/roomsmith/` | Editor REST API, behind the dashboard's normal auth | Verified |
-| Desktop SDK (`@hermes/plugin-sdk`): panes, routes, sidebar nav, palette, keybinds, `ctx.rest`, UI kit, theme variables | The editor's home in Hermes Desktop | Verified in docs; **not yet run** (spike S4) |
+| Desktop SDK (`@hermes/plugin-sdk`): panes, routes, sidebar nav, palette, keybinds, `ctx.rest`, UI kit, theme variables | The editor's home in Hermes Desktop | **Run live 8 Nov** in Desktop 0.21.0: pane, nav, chip, palette, `ctx.rest` work; the full-page route does not mount in that build (host-side) |
 | Dashboard SDK (`window.__HERMES_PLUGIN_SDK__`) | The editor as a browser tab | Verified in docs |
 
 What we deliberately do not use: tool overrides, middleware, model or provider overrides, `requires_env`, OAuth, background processes, shell commands, lazy pip installs.
@@ -375,7 +375,7 @@ Flow when the user pastes a product link:
 3. The plugin adds a stand-in box at true size, labelled with the product name, marked `dimensioned_placeholder` with `dims_source: stated`, and runs the fit check.
 4. If the page could not be read or has no dimensions, the agent asks the user for them. Typed dimensions always work.
 
-The editor's side panel shows the product card: title, sizes, price, link, and the product image when the host allows it to load (**unverified**, spike S4). The image is never required.
+The editor's side panel shows the product card: title, sizes, price, link, and the product image when the host allows it to load (not yet exercised with a real product URL in Desktop). The image is never required.
 
 Out of 0.1: real 3D product models, retailer accounts or APIs, price tracking.
 
@@ -456,7 +456,7 @@ One editor core, two thin shells.
 - The catalog lint refuses, in Desktop files: `eval(`, `new Function(`, dynamic `import()` outside the SDK, URL imports, `<script` or `createElement('script')`, selecting the app's own markup, observing `document.body`, and reaching for `webview`. The lint's own comments name bundled three.js as an expected case. The build runs this same lint and fails on any hit.
 - No hardcoded colours; theme variables only.
 
-**Unverified, settled in M0 (spike S4):** that a bundled three.js editor loads in Hermes Desktop (the Desktop app on whichever machine runs the demo), passes the lint, and stays under 1 MB.
+**Settled 8 Nov (spike S4):** the bundled three.js editor loads in Hermes Desktop 0.21.0 as a right pane, passes the authoritative lint (0.23 `validate`), and is 593 KB. The full-page route does not mount in that Desktop build (host-side; Kanban identical), so the pane is the demo surface.
 
 ---
 
@@ -586,13 +586,13 @@ Each milestone has a goal, deliverables, and exit criteria that are yes-or-no. T
 | Spike | Question | Pass |
 |---|---|---|
 | S0 | Can the Mini be reached read-only, and what Hermes version and model does it run? | **Passed 7 Nov:** `jessica`, Hermes v0.21.5 (git, dirty tree), Python 3.14.7. Model (GPT astra) per Sebb, not yet read from config |
-| S1 | Does a skeleton plugin load in the approved isolated Mini test home (and in the MacBook v0.21.0 as lower bound)? | **Passed 7 Nov on 0.21.0 (MacBook, isolated home):** `hermes plugins doctor --ci` OK (9 tools, 1 hook); the dashboard tab and backend run inside the real `hermes dashboard`. Mini run pending |
+| S1 | Does a skeleton plugin load in the approved isolated Mini test home (and in the MacBook v0.21.0 as lower bound)? | **Passed 7 Nov on 0.21.0 (MacBook, isolated home):** `hermes plugins doctor --ci` OK (9 tools, 1 hook); the dashboard tab and backend run inside the real `hermes dashboard`. **Mini 8 Nov:** pinned install at 0bf14fc + doctor passed in the test home (0.23.0+689); a chat turn is blocked until Sebb signs the test home into Codex |
 | S2 | Does `ctx.llm.complete_structured` accept an image through the plugin LLM door on the Mini's model (GPT astra, subscription)? This is a different door from chat and may use Hermes's vision-fallback routing | Pending (Mini test home). Code path implemented with a fallback ladder; tested with a fake `ctx.llm` |
 | S3 | Is a photo-read draft good enough to be worth editing? | Pending (needs 3–5 photos). Draft builder tested on fixture drafts |
-| S4 | Does a Desktop pane with bundled three.js load, pass the lint, and stay under 1 MB? | **Half passed 7 Nov:** both bundles 593 KB; Desktop lint clean (mirrored regexes); the same editor renders in the real dashboard. Desktop app run pending |
-| S5 | Does a tool write in chat reach the pane through the backend? | **Passed 7 Nov:** an agent-actor command through the backend appears in the editor within ~1 s (long-poll) with a toast and a flash |
+| S4 | Does a Desktop pane with bundled three.js load, pass the lint, and stay under 1 MB? | **Passed 8 Nov:** Hermes Desktop 0.21.0 (+37159) on the MacBook, launched fully isolated; Roomsmith discovered under Settings → Plugins, pane renders the WebGL room, `ctx.rest` works behind auth; 593 KB; the authoritative desktop-surface lint passed on the Mini. Caveat: the full-page route does not mount in this build (bundled Kanban identical) — the pane is the primary surface |
+| S5 | Does a tool write in chat reach the pane through the backend? | **Passed 7 Nov (dashboard) and 8 Nov (Desktop):** an agent-actor command appears in the editor within ~1–2 s (long-poll) with a toast and a flash |
 | S6 | How does a photo attached in chat reach a tool? | Pending on the Mini. Route B (`new_room` with `layout`) is implemented and tested as the path that needs nothing from the host |
-| S7 | Can we run `hermes plugins validate` without touching any live install? | Pending (throwaway Hermes v0.23.0) |
+| S7 | Can we run `hermes plugins validate` without touching any live install? | **Passed 8 Nov** on the Mini test checkout (0.23.0+689) at 0bf14fc, run by Harvey through `run-isolated.py`: all 16 checks ✓. Note `validate` takes a directory; it also reports that on 0.23 the plugin runs in the plugin host and the dashboard API is proxied with buffered responses |
 
 **Exit:** a filled-in results table. Any failed spike has its fallback chosen (section 19) before M1 starts.
 

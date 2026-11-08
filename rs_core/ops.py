@@ -18,6 +18,8 @@ from rs_core import placement
 from rs_core.catalog import normalize_category, spec_for
 from rs_core.model import SceneError
 
+OPENING_DEFAULT_WIDTH_M = {"door": 0.9, "window": 1.2, "opening": 1.2}
+
 # ---------------------------------------------------------------- receipts
 
 
@@ -227,10 +229,13 @@ def op_set_surface_color(scene: dict, op: dict) -> OpResult:
 
 
 def op_add_opening(scene: dict, op: dict) -> OpResult:
-    _require(op, "wall_id", "kind", "width_m")
+    if "wall_id" not in op and "wall" in op:
+        op = {**op, "wall_id": op["wall"]}  # `wall` accepts an id or a label such as "front"
+    _require(op, "wall_id", "kind")
     wall = m.find_wall(scene, str(op["wall_id"]))
     kind = _str(op["kind"], "kind", m.OPENING_KINDS)
-    width = _num(op["width_m"], "width_m", 0.3, 10.0)
+    # Typical widths when the model does not state one (door leaf, standard window).
+    width = _num(op.get("width_m", OPENING_DEFAULT_WIDTH_M[kind]), "width_m", 0.3, 10.0)
     L = m.wall_length(scene, wall)
     if "offset_m" in op:
         offset = _num(op["offset_m"], "offset_m", 0.0, m.ROOM_SIDE_MAX)  # explicit: validated, never clamped

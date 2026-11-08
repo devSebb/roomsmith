@@ -15,3 +15,9 @@ Built 2026-11-07, hackathon week.
 - Editor: three.js 3D/plan editor with snapping, live revisions, inspectors,
   calibration, products, fit questions, exports; Desktop and dashboard shells.
 - Verified on Hermes 0.21.0: `hermes plugins doctor --ci`, dashboard tab live.
+- 2026-11-08: verified in Hermes Desktop 0.21.0 (isolated launch): pane, sidebar
+  entry, status chip, `ctx.rest`, live agent→pane sync. `hermes plugins validate`
+  passed on a 0.23.0 checkout (Mini test home). `add_opening` accepts `wall`
+  (id or label) and defaults `width_m` (door 0.9 m, window 1.2 m). Toasts and
+  chips readable on dark hosts; narrow pane keeps a usable side panel; the
+  long-poll window adapts to proxies that cut long requests.

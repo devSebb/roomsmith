@@ -8,8 +8,8 @@ export const CSS = `
   display:grid;grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:38px minmax(0,1fr);height:100%;min-height:360px;width:100%;
   font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;position:relative;overflow:hidden;box-sizing:border-box}
 .rs-root *{box-sizing:border-box}
-.rs-root.rs-narrow{grid-template-columns:minmax(0,1fr);grid-template-rows:38px minmax(0,1fr) auto}
-.rs-root.rs-narrow .rs-panel{max-height:46%;border-left:0;border-top:1px solid var(--rs-line)}
+.rs-root.rs-narrow{grid-template-columns:minmax(0,1fr);grid-template-rows:38px minmax(0,1fr) minmax(200px,42%)}
+.rs-root.rs-narrow .rs-panel{border-left:0;border-top:1px solid var(--rs-line)}
 .rs-toolbar{grid-column:1/-1;display:flex;align-items:center;gap:6px;padding:0 8px;border-bottom:1px solid var(--rs-line);min-width:0;overflow:hidden}
 .rs-toolbar .rs-spacer{flex:1}
 .rs-canvas{position:relative;min-width:0;min-height:0;background:var(--rs-softer)}
@@ -51,12 +51,12 @@ export const CSS = `
 .rs-badge.warn{background:color-mix(in srgb,var(--rs-warn) 22%,transparent);color:inherit}
 .rs-badge.ok{background:color-mix(in srgb,var(--rs-ok) 22%,transparent)}
 .rs-toasts{position:absolute;left:10px;bottom:10px;display:flex;flex-direction:column;gap:6px;max-width:min(420px,calc(100% - 20px));pointer-events:none;z-index:5}
-.rs-toast{padding:8px 11px;border-radius:8px;background:color-mix(in srgb,currentColor 88%,transparent);color:#fff;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.25);pointer-events:auto;animation:rs-in .18s ease-out}
+.rs-toast{padding:8px 11px;border-radius:8px;background:color-mix(in srgb,currentColor 10%,var(--ui-bg-elevated,Canvas));border:1px solid var(--rs-line);color:inherit;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.25);pointer-events:auto;animation:rs-in .18s ease-out;backdrop-filter:blur(6px)}
 .rs-toast.agent{border-left:3px solid var(--rs-accent)}
 .rs-toast.warn{border-left:3px solid var(--rs-warn)}
 .rs-toast.error{border-left:3px solid var(--rs-bad)}
 @keyframes rs-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.rs-chip{position:absolute;top:10px;left:10px;padding:4px 9px;border-radius:12px;background:color-mix(in srgb,currentColor 85%,transparent);color:#fff;font-size:11px;z-index:4;pointer-events:none}
+.rs-chip{position:absolute;top:10px;left:10px;padding:4px 9px;border-radius:12px;background:color-mix(in srgb,currentColor 10%,var(--ui-bg-elevated,Canvas));border:1px solid var(--rs-line);color:inherit;font-size:11px;z-index:4;pointer-events:none}
 .rs-chip.bad{background:var(--rs-bad)}
 .rs-draft{position:absolute;top:10px;right:10px;padding:4px 9px;border-radius:12px;background:color-mix(in srgb,var(--rs-warn) 85%,transparent);color:#000;font-size:11px;z-index:4;cursor:pointer}
 .rs-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--rs-muted);text-align:center;padding:24px}
