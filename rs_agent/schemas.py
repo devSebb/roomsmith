@@ -11,7 +11,7 @@ _PLACE = {
         "optional align 'left'|'center'|'right' as seen from inside facing that wall, offset_m from that end); "
         "next_to (object id) with side 'left'|'right'|'front'|'behind' relative to that object's facing; "
         "in_corner [wall_a, wall_b]; centered_in_room true; on (object id, to rest on top of it); "
-        "by [dx, dz] to nudge; or position_m [x, y, z]. Optional gap_m (default 0.02), facing (wall id/label), yaw_deg."
+        "by [dx, dz] to nudge; or position_m [x, y, z] (y = height of the object's underside; ≥ 1.9 m counts as overhead and no longer blocks doors or walkways). Optional gap_m (default 0.02), facing (wall id/label), yaw_deg."
     ),
     "properties": {
         "against_wall": {"type": "string"},
@@ -76,7 +76,8 @@ NEW_ROOM = {
                     "openings:[{wall:'back'|'left'|'right'|'front', kind:'door'|'window'|'opening', position_fraction:0..1 along the wall "
                     "(0 at its left end seen from inside), width_m, height_m, sill_m}], "
                     "objects:[{label, category, width_m, height_m, depth_m, against_wall:'back'|'left'|'right'|'front'|'none', "
-                    "across_fraction:0..1 (left wall to right wall), into_fraction:0..1 (back wall to camera), facing, color, confidence}], notes}. "
+                    "across_fraction:0..1 (left wall to right wall), into_fraction:0..1 (back wall to camera), facing, "
+                    "mount:'floor'|'surface'|'wall'|'ceiling' (pendant lights are 'ceiling', pictures on a wall are 'wall'), elevation_m (height of its lowest point), color, confidence}], notes}. "
                     "Use real-world anchors (door ~0.8 x 2.03 m). Everything is marked estimated until calibrated."
                 ),
             },

@@ -100,8 +100,17 @@ def validate_hard(scene: dict) -> None:
 # ---------------------------------------------------------------- soft
 
 
+OVERHEAD_MIN_M = 1.9  # an object whose underside is this high is walked under, whatever its mount says
+
+
+def _is_overhead(o: dict) -> bool:
+    return float(o["position_m"][1]) >= OVERHEAD_MIN_M or o.get("mount") == "ceiling"
+
+
 def _floor_objects(scene: dict) -> list[dict]:
-    return [o for o in scene["objects"] if o.get("mount", "floor") == "floor" and o.get("category") != "rug"]
+    """Objects that occupy floor space for overlap, door, walkway and outside checks:
+    floor-mounted, not a rug, and not hanging overhead (pendant lights, a shelf at 2 m)."""
+    return [o for o in scene["objects"] if o.get("mount", "floor") == "floor" and o.get("category") != "rug" and not _is_overhead(o)]
 
 
 def issues(scene: dict, only_ids: Iterable[str] | None = None) -> list[dict]:
@@ -155,7 +164,7 @@ def _outside(scene: dict) -> list[dict]:
     out = []
     poly = m.outline(scene)
     for o in scene["objects"]:
-        if o.get("mount") == "wall":
+        if o.get("mount") in ("wall", "ceiling"):
             continue
         corners = m.footprint(o)
         if any(not g.point_in_polygon(c, poly, OUTSIDE_TOL) for c in corners):
@@ -222,7 +231,7 @@ def _window_blocks(scene: dict) -> list[dict]:
         start, end = m.opening_span(scene, o)
         sill = float(o["sill_m"])
         for obj in scene["objects"]:
-            if obj.get("mount") == "wall":
+            if obj.get("mount") in ("wall", "ceiling") or _is_overhead(obj):
                 continue
             if m.object_top(obj) <= sill + 1e-6:
                 continue

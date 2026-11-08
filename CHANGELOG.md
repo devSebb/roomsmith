@@ -39,6 +39,15 @@ Built 2026-11-07, hackathon week.
 - Editor: no right-button binding (Hermes Desktop owns right-click for its own
   menu); pan is ⇧-drag or middle-drag, shown in the hint. 60-object room measured
   at 60 fps in Desktop during orbit and drag.
+- From the first live photo read on the Mini (gpt-6-astra, S2 passed): the draft
+  schema gains `mount` and `elevation_m`; a new `lamp_ceiling` category (aliases
+  pendant, chandelier, ceiling light…) and label-based detection when the model
+  says 'other'; wall-mounted things get a height; fit checks are height-aware
+  (anything whose underside is ≥ 1.9 m, or mounted on the ceiling, no longer
+  blocks doors or walkways); draft notes clip at a word boundary (500 chars);
+  `next_step` tells the agent to review draft issues with the user, not fix them
+  blindly. S1 chat smoke passed on the Mini; `--image` is rejected by the gateway
+  CLI (S6 blocked there; path route works).
 - `web/dev/desktop-attach.mjs` + `web/dev/desktop-smoke.mjs`: the Desktop checklist
   as a script (sidebar entry, pane + WebGL, ctx.rest, status chip, full page, New
   room, editor follows an agent-created room, undo). `scripts/pin-catalog.py`

@@ -11,7 +11,7 @@ export interface Product { title?: string; url?: string | null; image_url?: stri
 export interface SceneObject {
   id: string; name: string; category: string; shape: 'box' | 'cylinder';
   dimensions_m: [number, number, number]; position_m: [number, number, number]; yaw_rad: number;
-  mount: 'floor' | 'wall' | 'surface'; color: string; locked: boolean;
+  mount: 'floor' | 'wall' | 'surface' | 'ceiling'; color: string; locked: boolean;
   provenance?: { class?: string; dims_source?: string; confidence?: number }; product?: Product | null
 }
 export interface Scene {

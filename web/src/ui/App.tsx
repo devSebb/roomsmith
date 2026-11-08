@@ -244,7 +244,7 @@ function ObjectInspector({ store, scene, o, openExternal }: { store: Store; scen
       <h4>Position</h4>
       <NumField label="X" value={o.position_m[0]} onCommit={v => setPos(0, v)} />
       <NumField label="Z" value={o.position_m[2]} onCommit={v => setPos(2, v)} />
-      {o.mount !== 'floor' && <NumField label="Y" value={o.position_m[1]} onCommit={v => setPos(1, v)} />}
+      {(o.mount !== 'floor' || o.position_m[1] > 0) && <NumField label="Y" value={o.position_m[1]} onCommit={v => setPos(1, v)} />}
       <NumField label="Facing" value={deg(o.yaw_rad)} unit="°" step={15} onCommit={v => store.rotateObject(o.id, rad(v))} />
       <div className="rs-row">
         <label>Colour</label>

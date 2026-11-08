@@ -133,6 +133,8 @@ def build_scene(project_id: str, name: str, draft: dict | None, notes: list[str]
             continue
         label = str(d.get("label") or d.get("name") or d.get("category") or f"Object {i + 1}").strip()[:60]
         category = normalize_category(d.get("category") or label)
+        if category == "other":
+            category = _category_from_label(label)
         spec = spec_for(category)
         dims = (
             _num(d.get("width_m"), spec.default[0], 0.01, 20.0),
@@ -172,13 +174,30 @@ def build_scene(project_id: str, name: str, draft: dict | None, notes: list[str]
             obj["yaw_rad"] = wyaw if yaw is None else yaw
         elif yaw is None:
             obj["yaw_rad"] = math.pi  # free-standing default: face the camera
-        if spec.mount == "surface" or _looks_tabletop(category, dims):
+        mount = _mount_name(d.get("mount")) or spec.mount
+        elevation = d.get("elevation_m")
+        elevation = _num(elevation, -1.0, 0.0, height) if isinstance(elevation, (int, float)) else None
+        if mount == "ceiling":
+            # hangs from the ceiling: its underside at elevation_m, else flush to the ceiling
+            obj["mount"] = "ceiling"
+            y = elevation if elevation is not None else height - dims[1]
+            obj["position_m"][1] = max(0.0, min(y, height - dims[1]))
+        elif mount == "wall":
+            obj["mount"] = "wall"
+            y = elevation if elevation is not None else 1.2
+            obj["position_m"][1] = max(0.0, min(y, height - dims[1]))
+        elif mount == "surface" or _looks_tabletop(category, dims):
             host = _host_under(placed, obj)
-            if host is not None and (spec.mount == "surface" or host.get("category") in SURFACE_HOSTS):
+            if host is not None and (mount == "surface" or host.get("category") in SURFACE_HOSTS):
                 obj["position_m"][1] = m.object_top(host)
                 obj["mount"] = "surface"
                 if spec.mount != "surface":
                     notes.append(f"{label}: placed on top of {host['name']}.")
+            elif mount == "surface" and elevation is not None:
+                obj["position_m"][1] = elevation
+                obj["mount"] = "surface"
+        elif elevation is not None and elevation >= 0.3:
+            obj["position_m"][1] = min(elevation, height - dims[1])  # e.g. a shelf fixed high on a wall
         _keep_inside(scene, obj)
         placed.append(obj)
         scene["objects"].append(obj)
@@ -190,8 +209,33 @@ def build_scene(project_id: str, name: str, draft: dict | None, notes: list[str]
         _keep_inside(scene, o)
     scene["photos"] = []
     if draft.get("notes"):
-        notes.append(str(draft["notes"])[:300])
+        notes.append(_clip(str(draft["notes"]), 500))
     return scene, notes
+
+
+CEILING_WORDS = ("ceiling light", "ceiling lamp", "pendant", "chandelier", "hanging light", "light fixture", "ceiling fan")
+
+
+def _category_from_label(label: str) -> str:
+    """When the model says 'other', a few label words still tell us how the thing mounts."""
+    low = label.lower()
+    if any(w in low for w in CEILING_WORDS):
+        return "lamp_ceiling"
+    return "other"
+
+
+def _mount_name(v: Any) -> str | None:
+    s = str(v or "").strip().lower()
+    return s if s in m.MOUNTS else None
+
+
+def _clip(text: str, n: int) -> str:
+    if len(text) <= n:
+        return text
+    cut = text[:n]
+    if " " in cut[n // 2 :]:
+        cut = cut[: cut.rfind(" ")]
+    return cut.rstrip(" ,;:") + "…"
 
 
 def _free_offset(offset: float, w: float, L: float, spans: list[tuple[float, float]]) -> float | None:
@@ -340,6 +384,8 @@ DRAFT_JSON_SCHEMA: dict = {
                     "across_fraction": {"type": "number", "description": "Centre position left (0) to right (1) across the room"},
                     "into_fraction": {"type": "number", "description": "Centre position from the back wall (0) to the camera (1)"},
                     "facing": {"type": "string", "enum": ["back", "left", "right", "front"], "description": "Which wall the object's front faces"},
+                    "mount": {"type": "string", "enum": ["floor", "surface", "wall", "ceiling"], "description": "floor: stands on the floor; surface: sits on another piece of furniture; wall: fixed to a wall (picture, mirror, wall TV, shelf); ceiling: hangs from the ceiling (pendant light)"},
+                    "elevation_m": {"type": "number", "description": "Height of the object's lowest point above the floor; 0 for floor objects, the table top for surface objects, the bottom edge for wall and ceiling objects"},
                     "color": {"type": "string", "description": "Hex colour like #6b7a8f"},
                     "confidence": {"type": "number"},
                 },
@@ -382,5 +428,6 @@ DRAFT_INSTRUCTIONS = """You are measuring a room from one or more photos for a 3
 Return only the JSON described by the schema. Think in metres.
 Use known sizes as anchors: an interior door is about 0.8 m wide and 2.03 m tall; a kitchen counter is about 0.9 m high; a sofa seat is about 0.45 m high; a standard ceiling is 2.4 to 2.7 m.
 Walls are named from the camera's point of view: 'back' is the wall the camera faces, 'left' and 'right' are the side walls, 'front' is behind the camera. Give every piece of furniture you can see with a short label, a category from the list, estimated width (across its front), height and depth, which wall it stands against ('none' if free-standing), its centre as fractions across the room (0 = left wall, 1 = right wall) and into the room (0 = back wall, 1 = camera), and which wall its front faces.
+Say how each thing is mounted: 'floor' for furniture standing on the floor, 'surface' for things sitting on other furniture (a plant on a table), 'wall' for things fixed to a wall (pictures, mirrors, wall-mounted TVs, shelves) and 'ceiling' for things hanging from the ceiling (pendant lights, fans); give elevation_m, the height of its lowest point above the floor. Pictures leaning on the floor are 'floor'.
 List doors and windows with the wall they are on and their centre as a fraction along that wall (0 at the wall's left end as seen from inside, 1 at its right end).
 Give a confidence from 0 to 1 per item and name the scale anchors you used. Do not invent things you cannot see; the far side of the room may be unknown."""

@@ -123,3 +123,45 @@ def test_small_plant_on_a_side_table_sits_on_it():
     assert any("placed on top of Side table" in n for n in notes)
     assert tall["mount"] == "floor" and tall["position_m"][1] == 0.0
     assert not [i for i in validate.issues(scene) if i["code"] == "overlap"]
+
+
+def test_ceiling_light_hangs_overhead_and_does_not_block_the_door():
+    """From the Mini S2 run: the model listed a pendant as category 'other' with no
+    vertical placement, so it landed on the floor and 'blocked the door'."""
+    draft = {
+        "room": {"width_m": 2.65, "depth_m": 4.4, "height_m": 2.7},
+        "openings": [{"wall": "back", "kind": "door", "position_fraction": 0.5, "width_m": 1.55, "height_m": 2.1}],
+        "objects": [
+            {"label": "Black branching ceiling light", "category": "other", "width_m": 1.25, "height_m": 0.65, "depth_m": 0.95, "against_wall": "none", "across_fraction": 0.45, "into_fraction": 0.4},
+            {"label": "Framed poster", "category": "picture", "width_m": 0.6, "height_m": 0.45, "depth_m": 0.03, "against_wall": "left", "across_fraction": 0.0, "into_fraction": 0.5, "mount": "wall", "elevation_m": 1.4},
+            {"label": "Pendant over table", "category": "pendant", "width_m": 0.3, "height_m": 0.3, "depth_m": 0.3, "against_wall": "none", "across_fraction": 0.5, "into_fraction": 0.6, "mount": "ceiling", "elevation_m": 1.95},
+        ],
+    }
+    scene, notes = layout.build_scene("p", "Photo", draft)
+    validate.validate_hard(scene)
+    light, poster, pendant = scene["objects"]
+    assert light["category"] == "lamp_ceiling" and light["mount"] == "ceiling"
+    assert abs(light["position_m"][1] - (2.7 - 0.65)) < 1e-6  # flush to the ceiling when no elevation given
+    assert poster["mount"] == "wall" and abs(poster["position_m"][1] - 1.4) < 1e-6
+    assert pendant["mount"] == "ceiling" and abs(pendant["position_m"][1] - 1.95) < 1e-6
+    codes = {i["code"] for i in validate.issues(scene)}
+    assert "blocks_door" not in codes and "tight_walkway" not in codes and "overlap" not in codes, validate.issues(scene)
+
+
+def test_floor_object_raised_overhead_stops_blocking():
+    """An object the agent lifted with position_m y ≥ 1.9 (mount still 'floor') is walked under."""
+    from rs_core import model as m, ops
+
+    scene = m.new_scene("p", "R", 3.0, 4.0, 2.7)
+    scene["room"]["openings"].append(m.make_opening(scene, "w1", "door", 1.0, 1.0, 2.1, 0.0))
+    scene = ops.apply_operations(scene, [{"op": "add_object", "name": "Light", "category": "other", "dimensions_m": [1.2, 0.6, 0.9], "place": {"position_m": [1.5, 0, 0.5]}}]).scene
+    assert any(i["code"] == "blocks_door" for i in validate.issues(scene))
+    scene = ops.apply_operations(scene, [{"op": "move_object", "id": "ob1", "place": {"position_m": [1.5, 2.05, 0.5]}}]).scene
+    assert not [i for i in validate.issues(scene) if i["code"] in ("blocks_door", "tight_walkway")]
+
+
+def test_draft_notes_are_clipped_at_a_word():
+    long = "word " * 200
+    scene, notes = layout.build_scene("p", "N", {"room": {"width_m": 3, "depth_m": 3}, "objects": [], "notes": long})
+    clipped = notes[-1]
+    assert clipped.endswith("…") and len(clipped) <= 501 and not clipped.endswith("wor…")

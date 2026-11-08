@@ -145,7 +145,7 @@ def room_from_photos(svc: RoomService, ctx: Any, args: dict) -> dict:
     out["notes"] = (out.get("notes") or []) + ladder + [p["message"] for p in problems]
     if draft:
         out["draft"] = {k: draft.get(k) for k in ("scale_anchors", "walls_visible", "notes") if draft.get(k)}
-        out["next_step"] = "This is a draft with estimated sizes. Ask the user for one real measurement (a wall length or the door width) and calibrate with roomsmith_apply."
+        out["next_step"] = "This is a draft with estimated sizes. Ask the user for one real measurement (a wall length or the door width) and calibrate with roomsmith_apply. Issues listed here come from estimated positions: mention them, but let the user confirm before moving things."
     else:
         out["next_step"] = "No draft could be read from the photo. Ask the user for the room's width, depth and the main furniture, then add them with roomsmith_apply."
     keep = {k: out[k] for k in ("ok", "project_id", "name", "revision", "text", "issues", "notes", "photos", "draft", "next_step", "room", "objects") if k in out}
