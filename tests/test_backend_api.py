@@ -89,3 +89,15 @@ def test_wait_long_poll_returns_immediately_when_newer(client):
     assert r["changed"] is True and r["revision"] == 1
     r = client.get(f"/api/plugins/roomsmith/projects/{pid}/wait?after=1&timeout=0.6").json()
     assert r["changed"] is False and r["revision"] == 1
+    assert r["active_project_id"] == pid and r["active_changed"] is False
+
+
+def test_wait_returns_at_once_when_the_active_room_changes(client):
+    """The agent creating/opening another room wakes the editor's long-poll so it can follow."""
+    a = client.post("/api/plugins/roomsmith/projects", json={"name": "A"}).json()["project_id"]
+    b = client.post("/api/plugins/roomsmith/projects", json={"name": "B"}).json()["project_id"]  # becomes active
+    r = client.get(f"/api/plugins/roomsmith/projects/{a}/wait?after=1&timeout=5&active={a}").json()
+    assert r["active_changed"] is True and r["active_project_id"] == b and r["changed"] is False
+    # Without the client's known id there is nothing to compare: plain timeout behaviour.
+    r = client.get(f"/api/plugins/roomsmith/projects/{a}/wait?after=1&timeout=0.3").json()
+    assert r["active_changed"] is False and r["active_project_id"] == b

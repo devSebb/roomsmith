@@ -62,6 +62,7 @@ export class Store {
   async refreshProjects() {
     try {
       const r = await this.api.listProjects()
+      this.knownActive = r.active_project_id
       this.set({ projects: r.projects, online: true, error: null })
       return r
     } catch (e: any) {
@@ -81,6 +82,7 @@ export class Store {
 
   async open(projectId: string) {
     this.pollAbort++
+    this.polling = false // an in-flight long-poll for the previous room exits on its token; start a fresh one
     this.set({ loading: true, projectId, selectedId: null, selectedOpeningId: null, selectedWallId: null })
     this.persist?.set('projectId', projectId)
     try {
@@ -100,6 +102,8 @@ export class Store {
 
   /** Long-poll window in seconds; adapts downward when the transport cuts long requests. */
   private waitSeconds = 20
+  /** The active room id the server last told us about; the editor follows when Hermes changes it. */
+  private knownActive: string | null = null
 
   private async startPolling() {
     if (this.polling) return
@@ -110,10 +114,20 @@ export class Store {
     while (!this.disposed && token === this.pollAbort && this.state.projectId) {
       const pid = this.state.projectId
       try {
-        const h = await this.api.wait(pid, this.state.revision, this.waitSeconds)
+        const h = await this.api.wait(pid, this.state.revision, this.waitSeconds, this.knownActive)
         if (token !== this.pollAbort) break
         backoff = 1000; failures = 0
         if (!this.state.online) this.set({ online: true, error: null })
+        if (h.active_changed && h.active_project_id && h.active_project_id !== pid && this.pending === 0) {
+          // Hermes created or opened another room: follow it, like a tab switch the agent made.
+          this.knownActive = h.active_project_id
+          const r = await this.refreshProjects()
+          const name = r?.projects.find(p => p.project_id === h.active_project_id)?.name || 'another room'
+          this.toast('agent', `Hermes opened ${name}`)
+          await this.open(h.active_project_id)
+          return
+        }
+        if (h.active_project_id !== undefined) this.knownActive = h.active_project_id
         if (h.changed && h.revision > this.state.revision && this.pending === 0) await this.pull(h)
       } catch (e: any) {
         if (token !== this.pollAbort) break

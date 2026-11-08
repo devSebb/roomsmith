@@ -21,3 +21,11 @@ Built 2026-11-07, hackathon week.
   (id or label) and defaults `width_m` (door 0.9 m, window 1.2 m). Toasts and
   chips readable on dark hosts; narrow pane keeps a usable side panel; the
   long-poll window adapts to proxies that cut long requests.
+- 2026-11-08 (later): the editor follows the agent — when Hermes creates or
+  opens another room, the long-poll (`wait?active=`) wakes at once and the open
+  editor switches to it with a toast. Fixed: switching rooms by hand left the
+  previous room's long-poll in flight and never started one for the new room,
+  so live sync stopped after a switch (covered by `web/tests/store.test.mjs`).
+  Full-page route confirmed working in Desktop after a cold start (routes are
+  not hot-reloaded). Photo pipeline exercised offline on the first real room
+  photo (PNG/RGBA → JPEG normalisation, draft → scene, photo registration).

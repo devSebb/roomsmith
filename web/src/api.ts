@@ -33,7 +33,10 @@ export class Api {
   rename(id: string, name: string) { return this.t.json<any>(`/projects/${id}`, { method: 'PATCH', body: { name } }).then(check) }
   delete(id: string) { return this.t.json<any>(`/projects/${id}`, { method: 'DELETE' }).then(check) }
   head(id: string) { return this.t.json<Head & { ok: boolean }>(`/projects/${id}/head`).then(check) }
-  wait(id: string, after: number, timeout = 25) { return this.t.json<Head & { ok: boolean; changed: boolean }>(`/projects/${id}/wait?after=${after}&timeout=${timeout}`, { timeoutMs: (timeout + 10) * 1000 }).then(check) }
+  wait(id: string, after: number, timeout = 25, active?: string | null) {
+    const q = `after=${after}&timeout=${timeout}` + (active ? `&active=${encodeURIComponent(active)}` : '')
+    return this.t.json<Head & { ok: boolean; changed: boolean; active_project_id?: string | null; active_changed?: boolean }>(`/projects/${id}/wait?${q}`, { timeoutMs: (timeout + 10) * 1000 }).then(check)
+  }
   scene(id: string) { return this.t.json<{ ok: boolean; revision: number; scene: Scene; issues: Issue[]; can_undo: boolean; can_redo: boolean; head: Head }>(`/projects/${id}/scene`).then(check) }
   history(id: string, limit = 30) { return this.t.json<{ ok: boolean; revisions: Revision[]; can_undo: boolean; can_redo: boolean }>(`/projects/${id}/history?limit=${limit}`).then(check) }
   apply(id: string, operations: Op[], expectedRevision?: number, commandId?: string) {

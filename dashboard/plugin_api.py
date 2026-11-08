@@ -249,9 +249,13 @@ async def export(project_id: str, format: str = "glb", encoding: str | None = No
 
 
 @router.get("/projects/{project_id}/wait")
-async def wait_for_change(project_id: str, after: int = 0, timeout: float = 25.0):
+async def wait_for_change(project_id: str, after: int = 0, timeout: float = 25.0, active: str | None = None):
     """Long-poll: returns as soon as the head revision passes `after`, or after
-    `timeout` seconds with the current head. Cheaper than polling every second."""
+    `timeout` seconds with the current head. Cheaper than polling every second.
+
+    `active` is the active room id the client last saw; when the agent opens or
+    creates another room the active id changes and the poll returns at once with
+    `active_changed: true` so the editor can follow."""
     import asyncio
 
     svc = _svc()
@@ -260,8 +264,12 @@ async def wait_for_change(project_id: str, after: int = 0, timeout: float = 25.0
         h = svc.head(project_id)
         if not h.get("ok"):
             return _reply(h)
-        if int(h["revision"]) > int(after) or time.monotonic() >= deadline:
+        current_active = svc.store.active_project_id()
+        active_changed = active is not None and current_active is not None and current_active != active
+        if int(h["revision"]) > int(after) or active_changed or time.monotonic() >= deadline:
             h["changed"] = int(h["revision"]) > int(after)
+            h["active_project_id"] = current_active
+            h["active_changed"] = active_changed
             return JSONResponse(h)
         await asyncio.sleep(0.5)
 
