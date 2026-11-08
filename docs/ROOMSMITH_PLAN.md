@@ -504,6 +504,8 @@ To state in the README and the catalog PR (catalog rule 13 requires disclosure):
 
 ### The catalog entry (draft)
 
+Maintained as `catalog/roomsmith.yaml` in this repo (a test keeps it in step with `plugin.yaml`); the snippet below is the shape. CI (`.github/workflows/validate.yml`) runs the engine tests on Python 3.11/3.13, the editor typecheck + tests + a rebuild that must match the committed bundles, and Hermes's own `plugins doctor --ci` and `plugins validate` against the pinned hermes-agent checkout a9ff9799 (plus a non-blocking run against `main`).
+
 ```yaml
 name: roomsmith
 title: Roomsmith

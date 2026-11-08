@@ -1,0 +1,40 @@
+# Draft of the Hermes plugin-catalog entry.
+# Destination: NousResearch/hermes-agent → plugin-catalog/roomsmith.yaml (one-file PR).
+# Before opening the PR: replace <SHA> with the full 40-character commit of this
+# repo that passed CI, `hermes plugins doctor --ci` and `hermes plugins validate`;
+# the image/screenshot URLs pin to that same commit. See docs/ROOMSMITH_PLAN.md §16.
+name: roomsmith
+title: Roomsmith
+repo: https://github.com/devSebb/roomsmith
+sha: "<SHA>"
+description: "Turn a room photo into an editable 3D room that you and Hermes edit together. Drag furniture in a live editor inside Hermes Desktop or the dashboard, or tell Hermes what to change — both work on one saved room with undo, and the editor follows what Hermes does. Add products from a link as true-size stand-ins, ask whether they fit, export GLB/JSON. Photo reading goes through the Hermes model you already use (no extra accounts); sizes are estimates until you give one real measurement."
+maintainer: devSebb
+tier: community
+category: desktop
+requires_hermes: ">=0.21.0"
+version: "0.1.0"
+platforms: [macos, linux]
+docs_url: https://github.com/devSebb/roomsmith#readme
+image: "https://raw.githubusercontent.com/devSebb/roomsmith/<SHA>/docs/banner.png"
+screenshots:
+  - "https://raw.githubusercontent.com/devSebb/roomsmith/<SHA>/docs/screenshots/desktop-page.png"
+  - "https://raw.githubusercontent.com/devSebb/roomsmith/<SHA>/docs/screenshots/desktop-pane-follow.png"
+readme: true
+known_issues:
+  - "Sizes read from a photo are estimates until you set one real measurement (a wall, the door, or an object)."
+  - "iPhone HEIC photos must be exported as JPEG/PNG first."
+  - "In Hermes Desktop, the full-page editor appears after an app restart; the side pane is available immediately."
+capabilities:
+  provides_tools:
+    - roomsmith_projects
+    - roomsmith_new_room
+    - roomsmith_from_photo
+    - roomsmith_inspect
+    - roomsmith_apply
+    - roomsmith_check
+    - roomsmith_add_product
+    - roomsmith_history
+    - roomsmith_export
+  provides_hooks: [pre_llm_call]
+  provides_middleware: []
+  requires_env: []

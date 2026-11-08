@@ -93,6 +93,26 @@ def test_register_matches_manifest(tmp_path, monkeypatch):
         json.dumps(t["schema"])  # serialisable
 
 
+def test_catalog_draft_matches_manifest():
+    """catalog/roomsmith.yaml (the one-file PR) must say the same as plugin.yaml."""
+    try:
+        import yaml  # Hermes ships PyYAML; optional here
+    except ImportError:
+        pytest.skip("pyyaml not installed")
+    manifest = yaml.safe_load((ROOT / "plugin.yaml").read_text())
+    entry = yaml.safe_load((ROOT / "catalog" / "roomsmith.yaml").read_text())
+    assert entry["name"] == manifest["name"] == "roomsmith"
+    assert entry["version"] == manifest["version"]
+    assert entry["requires_hermes"] == manifest["requires_hermes"]
+    assert entry["repo"] == manifest["homepage"]
+    assert entry["maintainer"] == manifest["author"]
+    caps = entry["capabilities"]
+    for k in ("provides_tools", "provides_hooks", "provides_middleware", "requires_env"):
+        assert sorted(caps[k]) == sorted(manifest[k]), k
+    assert len(entry["sha"]) == 40 or entry["sha"] == "<SHA>"
+    assert len(entry["description"]) <= 600
+
+
 def test_tool_round_trip_through_handlers(tmp_path, monkeypatch):
     monkeypatch.setenv("ROOMSMITH_DATA_DIR", str(tmp_path))
     mod = _load_plugin()

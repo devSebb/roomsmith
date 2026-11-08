@@ -1,0 +1,98 @@
+# Roomsmith CI: engine tests on the Pythons Hermes supports, editor typecheck
+# and tests with the committed bundles rebuilt and compared, and Hermes's own
+# `plugins doctor --ci` and `plugins validate` against a real hermes-agent
+# checkout (pinned to the revision the plugin was last verified on, plus a
+# non-blocking run against main so API drift shows up early).
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    name: engine tests (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install --quiet pytest fastapi httpx pillow pyyaml
+      - run: python -m pytest -q
+
+  editor:
+    name: editor typecheck, tests, reproducible bundles
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - name: committed bundles match a fresh build
+        working-directory: .
+        run: |
+          git diff --stat --exit-code desktop/plugin.js dashboard/dist/index.js \
+            || { echo "::error::desktop/plugin.js or dashboard/dist/index.js is stale — run 'npm run build' in web/ and commit"; exit 1; }
+
+  hermes:
+    name: hermes plugins doctor + validate (${{ matrix.label }})
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.allow_failure }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The checkout the plugin was last verified on (Hermes 0.23.0+689, Mini test home, 2026-11-08).
+          - label: pinned
+            hermes_ref: a9ff9799e273f525b82718cdc69fdec71b1dca5a
+            allow_failure: false
+          - label: main
+            hermes_ref: main
+            allow_failure: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: roomsmith
+      - uses: actions/checkout@v4
+        with:
+          repository: NousResearch/hermes-agent
+          ref: ${{ matrix.hermes_ref }}
+          path: hermes-agent
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v5
+      - name: install hermes-agent
+        run: |
+          uv venv .venv
+          uv pip install --python .venv/bin/python -e ./hermes-agent
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: hermes version
+        run: hermes --version || hermes version
+      - name: doctor
+        env:
+          HERMES_HOME: ${{ runner.temp }}/hermes-home
+        run: hermes plugins doctor ./roomsmith --ci
+      - name: validate
+        env:
+          HERMES_HOME: ${{ runner.temp }}/hermes-home
+        run: hermes plugins validate ./roomsmith
