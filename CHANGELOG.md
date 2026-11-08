@@ -29,3 +29,7 @@ Built 2026-11-07, hackathon week.
   Full-page route confirmed working in Desktop after a cold start (routes are
   not hot-reloaded). Photo pipeline exercised offline on the first real room
   photo (PNG/RGBA → JPEG normalisation, draft → scene, photo registration).
+- Layout builder: a small plant/box/'other' whose footprint lands on a table,
+  desk, dresser, shelf etc. is placed on top of it (surface mount) instead of
+  overlapping it on the floor — the first real photo had a plant on a side table.
+- CI (`validate.yml`) and the catalog entry draft (`catalog/roomsmith.yaml`).
