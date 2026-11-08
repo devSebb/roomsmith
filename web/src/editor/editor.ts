@@ -87,7 +87,10 @@ export class Editor {
     this.controls.maxPolarAngle = Math.PI / 2 - 0.02
     this.controls.minDistance = 1
     this.controls.maxDistance = 60
-    this.controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }
+    // No right-button binding: Hermes Desktop opens its own context menu on right-click from the
+    // main process (no renderer listener can stop it), so a right-drag pan would end in that menu.
+    // Pan = shift-drag (OrbitControls' modifier rule on LEFT) or middle-drag; dolly = wheel.
+    this.controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: null as any }
 
     this.buildLights()
     this.scene3.add(this.lights)
@@ -103,7 +106,8 @@ export class Editor {
     el.addEventListener('pointercancel', this.onPointerUp)
     el.addEventListener('dblclick', this.onDblClick)
     el.addEventListener('keydown', this.onKeyDown)
-    el.addEventListener('contextmenu', e => e.preventDefault())
+    // stopPropagation too: Hermes Desktop opens its own menu on contextmenu events that reach its root
+    el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation() })
     this.ro = new ResizeObserver(() => this.resize())
     this.ro.observe(container)
     this.resize()

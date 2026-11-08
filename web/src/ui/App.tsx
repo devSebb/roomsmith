@@ -115,7 +115,7 @@ export function App(props: AppProps) {
             <NewRoom store={store} api={props.api} compact />
           </div>
         )}
-        {scene && <div className="rs-help">drag to move · R rotate · ⌫ delete · ⌘D duplicate · ⌘Z undo · V view · F frame</div>}
+        {scene && <div className="rs-help">drag to move · ⇧drag pan · wheel zoom · R rotate · ⌫ delete · ⌘D duplicate · ⌘Z undo · V view · F frame</div>}
         <div className="rs-toasts">{s.toasts.map(t => <div key={t.id} className={'rs-toast ' + t.kind} onClick={() => t.ids?.[0] && store.select(t.ids[0])}>{t.text}</div>)}</div>
       </div>
       <div className="rs-panel">

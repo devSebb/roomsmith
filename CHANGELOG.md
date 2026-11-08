@@ -36,3 +36,6 @@ Built 2026-11-07, hackathon week.
 - `tests/test_demo_script.py`: the §18a demo run beat by beat through the tool
   handlers (photo → calibrate → swap/move → manual drag → blocks-door check →
   product → undo → export); 86 tests.
+- Editor: no right-button binding (Hermes Desktop owns right-click for its own
+  menu); pan is ⇧-drag or middle-drag, shown in the hint. 60-object room measured
+  at 60 fps in Desktop during orbit and drag.
