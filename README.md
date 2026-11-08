@@ -1,4 +1,4 @@
-# Room Studio — a Hermes Agent plugin
+# Roomsmith — a Hermes Agent plugin
 
 Turn a photo of a room into an editable 3D room. Move the furniture by hand in
 the editor or by talking to Hermes — both edit the same room, with undo. Paste a
@@ -29,13 +29,13 @@ before you buy.
 ## Install
 
 ```bash
-hermes plugins install devSebb/room-studio      # from the catalog / GitHub
-hermes plugins enable room-studio               # the agent half
+hermes plugins install devSebb/roomsmith      # from the catalog / GitHub
+hermes plugins enable roomsmith               # the agent half
 ```
 
 - **Desktop:** Hermes Desktop lists the plugin under **Settings → Plugins**;
-  switch it on to get the Room Studio pane, page and palette command.
-- **Dashboard:** `hermes dashboard` shows a **Room Studio** tab once the plugin
+  switch it on to get the Roomsmith pane, page and palette command.
+- **Dashboard:** `hermes dashboard` shows a **Roomsmith** tab once the plugin
   is enabled.
 
 Requires Hermes Agent ≥ 0.21.0. No API keys, no accounts, no network access of
@@ -65,7 +65,7 @@ plugin.yaml, __init__.py   agent half: 9 tools, /room, skill, awareness hook
 rs_core/                   the engine: scene model, operations, validation,
                            fit checks, SQLite store. Standard library only.
 rs_agent/                  Hermes-facing layer (tool schemas, handlers, photo)
-dashboard/plugin_api.py    FastAPI routes under /api/plugins/room-studio/
+dashboard/plugin_api.py    FastAPI routes under /api/plugins/roomsmith/
 dashboard/dist/index.js    the editor as a dashboard tab (built)
 desktop/plugin.js          the editor as a Hermes Desktop plugin (built)
 web/                       editor source (TypeScript, three.js, React) + build
@@ -75,7 +75,7 @@ docs/                      plan, compatibility record, screenshots
 ```
 
 The tools and the editor's backend may run in different processes; the SQLite
-file in `<hermes home>/plugin-data/room-studio/` is the only shared state.
+file in `<hermes home>/plugin-data/roomsmith/` is the only shared state.
 Writes are serialised with the database write lock and checked against the
 revision they were derived from, so nobody's edit is ever silently lost.
 
@@ -109,7 +109,7 @@ the room facing that wall.
   pages are read by Hermes's web tools, not by the plugin. The editor may load a
   product image from the address Hermes supplied.
 - **Files:** reads only the image files you name or upload; writes only inside
-  `<hermes home>/plugin-data/room-studio/` and to export paths you ask for.
+  `<hermes home>/plugin-data/roomsmith/` and to export paths you ask for.
 - **No** shell commands, background processes, telemetry, credentials, or
   self-update.
 

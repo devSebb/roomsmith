@@ -1,7 +1,7 @@
 // In the dashboard bundle, `react` resolves to the host's React via the SDK.
 const SDK = (window as any).__HERMES_PLUGIN_SDK__
 const R = SDK?.React
-if (!R) throw new Error('Room Studio: window.__HERMES_PLUGIN_SDK__.React is missing')
+if (!R) throw new Error('Roomsmith: window.__HERMES_PLUGIN_SDK__.React is missing')
 export default R
 export const useState = R.useState
 export const useEffect = R.useEffect

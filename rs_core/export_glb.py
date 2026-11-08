@@ -88,7 +88,7 @@ class _Builder:
         while len(self.bin) % 4:
             self.bin.append(0)
         gltf = {
-            "asset": {"version": "2.0", "generator": "Room Studio for Hermes Agent"},
+            "asset": {"version": "2.0", "generator": "Roomsmith for Hermes Agent"},
             "scene": 0,
             "scenes": [{"name": scene_name, "nodes": list(range(len(self.nodes)))}],
             "nodes": self.nodes,

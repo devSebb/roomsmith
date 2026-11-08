@@ -8,7 +8,7 @@ Built 2026-11-07, hackathon week.
   hard validation and soft issues, fit checks, SQLite store with full-snapshot
   revisions, undo/redo, idempotent commands, cross-process write transaction,
   product dimension parsing, draft→scene layout builder, GLB export.
-- Agent half: nine `room_studio_*` tools, `/room`, `room-design` skill,
+- Agent half: nine `roomsmith_*` tools, `/room`, `room-design` skill,
   `pre_llm_call` awareness hook; photo reading through `ctx.llm` with a fallback
   ladder.
 - Dashboard backend: FastAPI routes incl. long-poll `wait` and base64 export.

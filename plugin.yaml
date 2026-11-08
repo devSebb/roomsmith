@@ -1,20 +1,20 @@
-name: room-studio
+name: roomsmith
 version: 0.1.0
 description: Photo to editable 3D room. Edit by hand or by talking to Hermes, add products at true size, check what fits.
 author: devSebb
-homepage: https://github.com/devSebb/room-studio
+homepage: https://github.com/devSebb/roomsmith
 license: MIT
 requires_hermes: ">=0.21.0"
 provides_tools:
-  - room_studio_projects
-  - room_studio_new_room
-  - room_studio_from_photo
-  - room_studio_inspect
-  - room_studio_apply
-  - room_studio_check
-  - room_studio_add_product
-  - room_studio_history
-  - room_studio_export
+  - roomsmith_projects
+  - roomsmith_new_room
+  - roomsmith_from_photo
+  - roomsmith_inspect
+  - roomsmith_apply
+  - roomsmith_check
+  - roomsmith_add_product
+  - roomsmith_history
+  - roomsmith_export
 provides_hooks:
   - pre_llm_call
 provides_middleware: []

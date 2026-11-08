@@ -46,9 +46,9 @@ class RecordingContext:
 
 
 def _load_plugin():
-    spec = importlib.util.spec_from_file_location("hermes_plugins.room_studio_test", ROOT / "__init__.py", submodule_search_locations=[str(ROOT)])
+    spec = importlib.util.spec_from_file_location("hermes_plugins.roomsmith_test", ROOT / "__init__.py", submodule_search_locations=[str(ROOT)])
     mod = importlib.util.module_from_spec(spec)
-    mod.__package__ = "hermes_plugins.room_studio_test"
+    mod.__package__ = "hermes_plugins.roomsmith_test"
     sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)
     return mod
@@ -74,7 +74,7 @@ def _manifest():
 
 
 def test_register_matches_manifest(tmp_path, monkeypatch):
-    monkeypatch.setenv("ROOM_STUDIO_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("ROOMSMITH_DATA_DIR", str(tmp_path))
     mod = _load_plugin()
     ctx = RecordingContext()
     mod.register(ctx)
@@ -83,10 +83,10 @@ def test_register_matches_manifest(tmp_path, monkeypatch):
     assert sorted(ctx.hooks) == sorted(manifest["provides_hooks"])
     assert "room" in ctx.commands
     assert "room-design" in ctx.skills
-    assert manifest["name"] == "room-studio"
+    assert manifest["name"] == "roomsmith"
     assert manifest["requires_hermes"].startswith(">=")
     for name, t in ctx.tools.items():
-        assert t["toolset"] == "room_studio"
+        assert t["toolset"] == "roomsmith"
         assert t["schema"]["name"] == name
         assert t["schema"]["parameters"]["type"] == "object"
         assert len(t["description"]) <= 160
@@ -94,7 +94,7 @@ def test_register_matches_manifest(tmp_path, monkeypatch):
 
 
 def test_tool_round_trip_through_handlers(tmp_path, monkeypatch):
-    monkeypatch.setenv("ROOM_STUDIO_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("ROOMSMITH_DATA_DIR", str(tmp_path))
     mod = _load_plugin()
     from rs_agent import tools
 
@@ -103,11 +103,11 @@ def test_tool_round_trip_through_handlers(tmp_path, monkeypatch):
     mod.register(ctx)
     call = lambda tool, **args: json.loads(ctx.tools[tool]["handler"](args, task_id="t", session_id="s1"))  # noqa: E731
 
-    r = call("room_studio_new_room", name="Study", width_m=3.5, depth_m=4.0, height_m=2.6)
+    r = call("roomsmith_new_room", name="Study", width_m=3.5, depth_m=4.0, height_m=2.6)
     assert r["ok"] and r["revision"] == 1 and r["calibration"] == "calibrated"
     rev = r["revision"]
     r = call(
-        "room_studio_apply",
+        "roomsmith_apply",
         expected_revision=rev,
         operations=[
             {"op": "add_opening", "wall_id": "left", "kind": "door", "position_fraction": 0.5, "width_m": 0.9},
@@ -117,32 +117,32 @@ def test_tool_round_trip_through_handlers(tmp_path, monkeypatch):
     )
     assert r["ok"], r
     assert r["results"][1]["created_id"] == "ob1"
-    r = call("room_studio_inspect")
+    r = call("roomsmith_inspect")
     assert r["ok"] and len(r["objects"]) == 2 and "Desk" in r["text"]
-    stale = call("room_studio_apply", expected_revision=1, operations=[{"op": "set_room_height", "height_m": 2.7}])
+    stale = call("roomsmith_apply", expected_revision=1, operations=[{"op": "set_room_height", "height_m": 2.7}])
     assert stale["error"]["code"] == "revision_conflict"
-    r = call("room_studio_check", question="where_fits", dimensions_m=[0.8, 2.0, 0.3])
+    r = call("roomsmith_check", question="where_fits", dimensions_m=[0.8, 2.0, 0.3])
     assert r["ok"] and r["found"] >= 1
-    r = call("room_studio_add_product", title="BILLY bookcase", dimensions_text="Width: 80 cm, Depth: 28 cm, Height: 202 cm", url="https://example.com/billy", place={"against_wall": "right", "align": "left"})
+    r = call("roomsmith_add_product", title="BILLY bookcase", dimensions_text="Width: 80 cm, Depth: 28 cm, Height: 202 cm", url="https://example.com/billy", place={"against_wall": "right", "align": "left"})
     assert r["ok"] and r["object"]["dimensions_m"] == [0.8, 2.02, 0.28]
-    r = call("room_studio_history", action="undo")
+    r = call("roomsmith_history", action="undo")
     assert r["ok"] and len(r["objects"]) == 2
-    r = call("room_studio_history", action="list")
+    r = call("roomsmith_history", action="list")
     assert r["ok"] and r["revisions"][0]["actor"] == "agent"
-    r = call("room_studio_export", format="glb", out_dir=str(tmp_path / "exp"))
+    r = call("roomsmith_export", format="glb", out_dir=str(tmp_path / "exp"))
     assert r["ok"] and Path(r["path"]).stat().st_size > 100
-    r = call("room_studio_projects")
+    r = call("roomsmith_projects")
     assert r["ok"] and r["projects"][0]["name"] == "Study"
     # bad input never raises
-    r = call("room_studio_apply", operations="nope")
+    r = call("roomsmith_apply", operations="nope")
     assert r["ok"] is False
-    r = ctx.tools["room_studio_apply"]["handler"](None)
+    r = ctx.tools["roomsmith_apply"]["handler"](None)
     assert json.loads(r)["ok"] is False
     assert "Study" in ctx.commands["room"]("")
 
 
 def test_awareness_hook_only_after_tool_use(tmp_path, monkeypatch):
-    monkeypatch.setenv("ROOM_STUDIO_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("ROOMSMITH_DATA_DIR", str(tmp_path))
     mod = _load_plugin()
     from rs_agent import tools
 
@@ -152,7 +152,7 @@ def test_awareness_hook_only_after_tool_use(tmp_path, monkeypatch):
     hook = ctx.hooks["pre_llm_call"][0]
     assert hook(session_id="fresh") is None
     call = lambda tool, **args: json.loads(ctx.tools[tool]["handler"](args, session_id="s9"))  # noqa: E731
-    call("room_studio_new_room", name="Bedroom", width_m=4, depth_m=4)
+    call("roomsmith_new_room", name="Bedroom", width_m=4, depth_m=4)
     assert hook(session_id="s9") is None  # nothing unseen: the agent made the room
     svc = tools.get_service()
     svc.apply({"actor": "user", "operations": [{"op": "add_object", "name": "Bed", "category": "bed_double"}]})
@@ -164,7 +164,7 @@ def test_awareness_hook_only_after_tool_use(tmp_path, monkeypatch):
 
 
 def test_from_photo_without_llm_falls_back(tmp_path, monkeypatch):
-    monkeypatch.setenv("ROOM_STUDIO_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("ROOMSMITH_DATA_DIR", str(tmp_path))
     mod = _load_plugin()
     from rs_agent import tools
 
@@ -179,14 +179,14 @@ def test_from_photo_without_llm_falls_back(tmp_path, monkeypatch):
         pass
 
     mod._ctx = NoLlmCtx()
-    r = json.loads(ctx.tools["room_studio_from_photo"]["handler"]({"images": [str(img)], "name": "Fallback"}))
+    r = json.loads(ctx.tools["roomsmith_from_photo"]["handler"]({"images": [str(img)], "name": "Fallback"}))
     assert r["ok"] and r["name"] == "Fallback"
     assert any("default room" in n for n in r["notes"])
     assert r["photos"]
 
 
 def test_from_photo_with_fake_llm(tmp_path, monkeypatch):
-    monkeypatch.setenv("ROOM_STUDIO_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("ROOMSMITH_DATA_DIR", str(tmp_path))
     mod = _load_plugin()
     from rs_agent import tools
 
@@ -211,7 +211,7 @@ def test_from_photo_with_fake_llm(tmp_path, monkeypatch):
         llm = Llm()
 
     mod._ctx = Ctx()
-    r = json.loads(ctx.tools["room_studio_from_photo"]["handler"]({"images": [str(img)], "name": "Living", "notes": "the sofa is 2.1 m"}))
+    r = json.loads(ctx.tools["roomsmith_from_photo"]["handler"]({"images": [str(img)], "name": "Living", "notes": "the sofa is 2.1 m"}))
     assert r["ok"], r
     assert len(r["objects"]) == len(draft["objects"])
     assert seen["json_schema"]["type"] == "object"

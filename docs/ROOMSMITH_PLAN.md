@@ -1,4 +1,6 @@
-# Room Studio — build plan
+> **Name:** the plugin was renamed from "Room Studio" to **Roomsmith** on 7 November 2026 (id `roomsmith`, tools `roomsmith_*`, repo `devSebb/roomsmith`). Older mentions below are historical.
+
+# Roomsmith — build plan
 
 A Hermes Agent plugin that turns a room photo into an editable 3D room which you and Hermes edit together.
 
@@ -23,7 +25,7 @@ Every claim about Hermes in this document is marked **verified** (read in source
 
 Each side sees the other's edits within about a second. Hermes can also answer questions that need real geometry: what overlaps, what blocks the door, whether a product fits.
 
-**Why this is a plugin and not a prompt or a skill.** The hackathon judges "favor plugins that do more than a prompt or a skill could". Room Studio has four things a prompt cannot have:
+**Why this is a plugin and not a prompt or a skill.** The hackathon judges "favor plugins that do more than a prompt or a skill could". Roomsmith has four things a prompt cannot have:
 
 1. A persistent room with stable identities, revisions and undo.
 2. A live visual editor inside the Hermes window.
@@ -40,7 +42,7 @@ Each side sees the other's edits within about a second. Hermes can also answer q
 
 | Requirement (from the Nous Research post) | How we meet it |
 |---|---|
-| Open a pull request adding the plugin to the Hermes plugin catalog | One file, `plugin-catalog/room-studio.yaml`, in `NousResearch/hermes-agent`, pinned to a full commit SHA of the public plugin repo (section 16) |
+| Open a pull request adding the plugin to the Hermes plugin catalog | One file, `plugin-catalog/roomsmith.yaml`, in `NousResearch/hermes-agent`, pinned to a full commit SHA of the public plugin repo (section 16) |
 | Post a demo video on X tagging @NousResearch, under 90 seconds, showing the plugin working | Script in section 18; recorded Tuesday |
 | Submit both links through the form | After the PR is open; the post says the form can be submitted as soon as the PR is open and catalog checks run later |
 | Usefulness | Fit checks and true-size product stand-ins answer a real question: "will it fit, and where?" |
@@ -76,14 +78,14 @@ A Hermes plugin is a folder under `~/.hermes/plugins/<id>/`. One folder can carr
 | Part | File | Loaded by | Runs in | Purpose for us |
 |---|---|---|---|---|
 | Agent half | `plugin.yaml` + `__init__.py` with `register(ctx)` | Hermes plugin manager, when the plugin is in `plugins.enabled` | The process running the agent (CLI process, or the gateway for Desktop and messaging) | Tools, slash command, skill, one hook |
-| Backend half | `dashboard/manifest.json` + `dashboard/plugin_api.py` exporting a FastAPI `router` | The web server, mounted at `/api/plugins/room-studio/` (only when the plugin is in `plugins.enabled`) | The dashboard / gateway process | REST routes the editor calls |
+| Backend half | `dashboard/manifest.json` + `dashboard/plugin_api.py` exporting a FastAPI `router` | The web server, mounted at `/api/plugins/roomsmith/` (only when the plugin is in `plugins.enabled`) | The dashboard / gateway process | REST routes the editor calls |
 | Desktop half | `desktop/plugin.js` (one plain ESM file) | Hermes Desktop, scanning `~/.hermes/plugins/<id>/desktop/` | The Desktop window (Electron renderer) | The 3D editor as a pane and a page |
 | Dashboard half | `dashboard/dist/index.js` (one IIFE file) | The web dashboard (`hermes dashboard`) | The browser | The same editor as a dashboard tab |
 
 Consequences that shape the design:
 
 - **The agent half and the backend half can run in different processes.** A tool call in a terminal chat and an editor request in the dashboard do not share memory. Therefore **SQLite on disk is the only shared state**; no in-memory singletons hold room data.
-- **The backend file is imported on its own**, under the module name `hermes_dashboard_plugin_room-studio`, not as part of the plugin package. It cannot use relative imports. The shared engine therefore lives in a normal package folder that both halves import by path (section 5).
+- **The backend file is imported on its own**, under the module name `hermes_dashboard_plugin_roomsmith`, not as part of the plugin package. It cannot use relative imports. The shared engine therefore lives in a normal package folder that both halves import by path (section 5).
 - **The backend has no `ctx`.** Only the agent half receives the plugin context, so only tools can call Hermes's model (`ctx.llm`). The photo read is a tool, not a backend route.
 - **Each half has its own enable switch.** The Python halves need the plugin in `plugins.enabled` in `config.yaml`; the Desktop half is toggled in Settings → Plugins and ships off by default. The README must say so in three lines.
 
@@ -96,8 +98,8 @@ Consequences that shape the design:
 | `ctx.register_command("room", …)` | `/room` slash command: status and how to open the editor | Verified |
 | `ctx.register_skill(name, path)` | Bundled skill teaching the agent the edit loop | Verified |
 | `ctx.register_hook("pre_llm_call", …)` | Tell the agent, in the current turn only, what the user changed by hand since the agent last looked | Verified |
-| `plugins.plugin_storage.plugin_data_dir` / `plugin_db` | Durable data at `~/.hermes/plugin-data/room-studio/` (SQLite in WAL mode, built for one reader and one writer in different processes). Survives plugin update and removal | Verified; listed in the public plugin API |
-| Backend router at `/api/plugins/room-studio/` | Editor REST API, behind the dashboard's normal auth | Verified |
+| `plugins.plugin_storage.plugin_data_dir` / `plugin_db` | Durable data at `~/.hermes/plugin-data/roomsmith/` (SQLite in WAL mode, built for one reader and one writer in different processes). Survives plugin update and removal | Verified; listed in the public plugin API |
+| Backend router at `/api/plugins/roomsmith/` | Editor REST API, behind the dashboard's normal auth | Verified |
 | Desktop SDK (`@hermes/plugin-sdk`): panes, routes, sidebar nav, palette, keybinds, `ctx.rest`, UI kit, theme variables | The editor's home in Hermes Desktop | Verified in docs; **not yet run** (spike S4) |
 | Dashboard SDK (`window.__HERMES_PLUGIN_SDK__`) | The editor as a browser tab | Verified in docs |
 
@@ -120,10 +122,10 @@ Python 3.11, and in its own environment: FastAPI, Pillow, `jsonschema`, numpy (*
 
 ## 5. Repository layout
 
-The repository root **is** the plugin folder, so `hermes plugins install devSebb/room-studio` works and the catalog entry needs no `subdir`.
+The repository root **is** the plugin folder, so `hermes plugins install devSebb/roomsmith` works and the catalog entry needs no `subdir`.
 
 ```
-room-studio/                      # repo root = plugin root
+roomsmith/                      # repo root = plugin root
 ├── plugin.yaml                   # manifest: name, version, tools, hooks, requires_hermes
 ├── __init__.py                   # register(ctx): tools, /room, skill, hook. Thin wiring only
 ├── rs_core/                      # the engine. Standard library only. No Hermes imports
@@ -167,7 +169,7 @@ room-studio/                      # repo root = plugin root
 ├── docs/                         # banner (1200x600), screenshots, demo script
 ├── .github/workflows/validate.yml  # Hermes's own plugin-validate action + tests + build check
 ├── README.md  LICENSE  CHANGELOG.md  THIRD_PARTY_NOTICES.md
-└── ROOM_STUDIO_PLAN.md           # this file (moves to docs/ when the repo is initialised)
+└── ROOMSMITH_PLAN.md           # this file (moves to docs/ when the repo is initialised)
 ```
 
 Rules for this layout:
@@ -289,7 +291,7 @@ The result reports the final coordinates and any issues the move caused.
 
 ### Storage
 
-SQLite at `~/.hermes/plugin-data/room-studio/data.db`, opened through Hermes's `plugin_db` (WAL mode). Tables: `projects`, `revisions` (scene JSON, actor, summary, changed IDs), `commands` (receipts for idempotency), `history` (undo and redo stacks), `photos`, `meta` (schema version, active project). Writes use `BEGIN IMMEDIATE` and compare the revision inside the transaction. Photos are files under `photos/` in the same data folder.
+SQLite at `~/.hermes/plugin-data/roomsmith/data.db`, opened through Hermes's `plugin_db` (WAL mode). Tables: `projects`, `revisions` (scene JSON, actor, summary, changed IDs), `commands` (receipts for idempotency), `history` (undo and redo stacks), `photos`, `meta` (schema version, active project). Writes use `BEGIN IMMEDIATE` and compare the revision inside the transaction. Photos are files under `photos/` in the same data folder.
 
 ---
 
@@ -341,7 +343,7 @@ All numbers are computed by code and returned with units, so the agent quotes th
 
 ### Route B — Hermes itself reads the photo
 
-If the user attaches the photo in chat and the active model sees it directly, the agent can call `room_studio_new_room` with a `layout` argument in the same fraction format. Same builder, same result, no second model call. This also covers hosts where the plugin cannot reach the image file.
+If the user attaches the photo in chat and the active model sees it directly, the agent can call `roomsmith_new_room` with a `layout` argument in the same fraction format. Same builder, same result, no second model call. This also covers hosts where the plugin cannot reach the image file.
 
 ### The fallback ladder
 
@@ -369,7 +371,7 @@ The plugin makes **no network requests of its own**. Hermes already has web tool
 Flow when the user pastes a product link:
 
 1. The skill tells the agent to read the page with its own web tools and pull out the title, the dimensions text, the price and a product image address.
-2. The agent calls `room_studio_add_product` with those fields. The plugin parses the dimensions text in code (`dims.py`): centimetres, millimetres, metres, inches, feet-and-inches; "W × D × H", "L × W × H", labelled or unlabelled; decimal commas.
+2. The agent calls `roomsmith_add_product` with those fields. The plugin parses the dimensions text in code (`dims.py`): centimetres, millimetres, metres, inches, feet-and-inches; "W × D × H", "L × W × H", labelled or unlabelled; decimal commas.
 3. The plugin adds a stand-in box at true size, labelled with the product name, marked `dimensioned_placeholder` with `dims_source: stated`, and runs the fit check.
 4. If the page could not be read or has no dimensions, the agent asks the user for them. Typed dimensions always work.
 
@@ -381,25 +383,25 @@ Out of 0.1: real 3D product models, retailer accounts or APIs, price tracking.
 
 ## 11. Agent tools
 
-Toolset `room_studio`. Nine tools, each with a description written for the model. All return JSON strings and never raise.
+Toolset `roomsmith`. Nine tools, each with a description written for the model. All return JSON strings and never raise.
 
 | Tool | Purpose | Key arguments |
 |---|---|---|
-| `room_studio_projects` | List rooms, show or switch the active one, say how to open the editor | `action`: list / activate / rename / delete, `project_id` |
-| `room_studio_new_room` | Create a room from dimensions, or from a `layout` draft (Route B) | `name`, `width_m`, `depth_m`, `height_m`, or `layout` |
-| `room_studio_from_photo` | Read photos and build a draft room (Route A) | `images` (paths or photo IDs), `name`, `notes` |
-| `room_studio_inspect` | The current room in compact form: walls with lengths, openings, objects with IDs, sizes and positions, revision, open issues | `project_id`, `detail`: summary / full |
-| `room_studio_apply` | Apply one atomic batch of operations (section 7) | `project_id`, `expected_revision`, `operations` |
-| `room_studio_check` | Fit check: all issues, or a specific question | `project_id`, `question`: issues / fits_at / where_fits / passes_door, plus sizes and targets |
-| `room_studio_add_product` | Add a product as a true-size stand-in | `title`, `dimensions_text` or `dimensions_m`, `url`, `image_url`, `price`, `place` |
-| `room_studio_history` | Undo, redo, or list recent revisions | `project_id`, `action`: undo / redo / list, `steps` |
-| `room_studio_export` | Write the room to a file and return its path | `project_id`, `format`: json / glb / summary |
+| `roomsmith_projects` | List rooms, show or switch the active one, say how to open the editor | `action`: list / activate / rename / delete, `project_id` |
+| `roomsmith_new_room` | Create a room from dimensions, or from a `layout` draft (Route B) | `name`, `width_m`, `depth_m`, `height_m`, or `layout` |
+| `roomsmith_from_photo` | Read photos and build a draft room (Route A) | `images` (paths or photo IDs), `name`, `notes` |
+| `roomsmith_inspect` | The current room in compact form: walls with lengths, openings, objects with IDs, sizes and positions, revision, open issues | `project_id`, `detail`: summary / full |
+| `roomsmith_apply` | Apply one atomic batch of operations (section 7) | `project_id`, `expected_revision`, `operations` |
+| `roomsmith_check` | Fit check: all issues, or a specific question | `project_id`, `question`: issues / fits_at / where_fits / passes_door, plus sizes and targets |
+| `roomsmith_add_product` | Add a product as a true-size stand-in | `title`, `dimensions_text` or `dimensions_m`, `url`, `image_url`, `price`, `place` |
+| `roomsmith_history` | Undo, redo, or list recent revisions | `project_id`, `action`: undo / redo / list, `steps` |
+| `roomsmith_export` | Write the room to a file and return its path | `project_id`, `format`: json / glb / summary |
 
 Also registered:
 
 - **`/room`** — shows the active room, its revision and issue count, and how to open the editor.
-- **Skill `room-studio:room-design`** — the working loop (inspect → apply → check → report), unit and direction conventions, how to add a product from a link, when to ask for a measurement.
-- **Hook `pre_llm_call`** — only in sessions that have already used a Room Studio tool, and only when the user has changed the room in the editor since the agent last saw it. It adds two or three lines to the current turn: "Since revision 12 the user moved Armchair and resized Desk. Current revision 14." Nothing is injected otherwise. It is added to the user message for that turn only, so the cached system prompt is untouched.
+- **Skill `roomsmith:room-design`** — the working loop (inspect → apply → check → report), unit and direction conventions, how to add a product from a link, when to ask for a measurement.
+- **Hook `pre_llm_call`** — only in sessions that have already used a Roomsmith tool, and only when the user has changed the room in the editor since the agent last saw it. It adds two or three lines to the current turn: "Since revision 12 the user moved Armchair and resized Desk. Current revision 14." Nothing is injected otherwise. It is added to the user message for that turn only, so the cached system prompt is untouched.
 
 Registration rule learned from the catalog validator: its probe calls `register()` against a stub that has methods but not properties. `register()` must therefore not touch `ctx.llm` or `ctx.state`; handlers read them lazily at call time.
 
@@ -407,7 +409,7 @@ Registration rule learned from the catalog validator: its probe calls `register(
 
 ## 12. Backend routes
 
-Mounted by Hermes at `/api/plugins/room-studio/`, behind the dashboard's auth. Thin wrappers over the same `rs_core.service` the tools use.
+Mounted by Hermes at `/api/plugins/roomsmith/`, behind the dashboard's auth. Thin wrappers over the same `rs_core.service` the tools use.
 
 | Route | Purpose |
 |---|---|
@@ -473,7 +475,7 @@ Out of 0.1: Blender scene export, USDZ, dimensioned floor-plan PDF.
 To state in the README and the catalog PR (catalog rule 13 requires disclosure):
 
 - **Network.** The plugin makes no network requests of its own. Photos you choose are sent to your active Hermes model provider through Hermes's own model access. Product pages are read by Hermes's web tools, not by the plugin. The editor may load a product image from the address the agent supplied.
-- **Files.** Reads only image files you name or upload. Writes only inside `~/.hermes/plugin-data/room-studio/` and to export paths you ask for.
+- **Files.** Reads only image files you name or upload. Writes only inside `~/.hermes/plugin-data/roomsmith/` and to export paths you ask for.
 - **No** shell commands, background processes, telemetry, credentials, or self-update.
 - **Cost.** Each photo read is one call to your model with one to four images.
 
@@ -485,7 +487,7 @@ To state in the README and the catalog PR (catalog rule 13 requires disclosure):
 
 | Rule | Our position |
 |---|---|
-| Public `https://` repo, loadable at the pinned commit | `https://github.com/devSebb/room-studio`; root `plugin.yaml` + `__init__.py` + `desktop/plugin.js` + `dashboard/manifest.json` |
+| Public `https://` repo, loadable at the pinned commit | `https://github.com/devSebb/roomsmith`; root `plugin.yaml` + `__init__.py` + `desktop/plugin.js` + `dashboard/manifest.json` |
 | Full 40-character SHA; quoted `version`; SHA bumps are new PRs | Pin once, late, after the clean-install test. Every later fix costs a new PR, so freeze before pinning |
 | Submitter is the repo owner | PR from `devSebb`. On this Mac `gh` is logged in as both `click-dev1` (active) and `devSebb`; switch before publishing |
 | Declared capabilities match what `register()` registers | A test asserts the tool and hook lists in `plugin.yaml` equal what a recording context sees |
@@ -498,14 +500,14 @@ To state in the README and the catalog PR (catalog rule 13 requires disclosure):
 | Risks disclosed | Section 15, copied into the PR and README |
 | Truthful `requires_hermes` (SemVer floor, not newer than the current release), same in `plugin.yaml` and the entry | Set from what we actually tested |
 | No unscannable payloads | Text only; built JS is reproducible from `web/` |
-| Tool names must not collide with built-ins | All prefixed `room_studio_` |
+| Tool names must not collide with built-ins | All prefixed `roomsmith_` |
 
 ### The catalog entry (draft)
 
 ```yaml
-name: room-studio
-title: Room Studio
-repo: https://github.com/devSebb/room-studio
+name: roomsmith
+title: Roomsmith
+repo: https://github.com/devSebb/roomsmith
 sha: "<40-character commit>"
 description: "Turn a room photo into an editable 3D room that you and Hermes edit together: drag furniture in a live editor inside Hermes Desktop, or tell Hermes what to change, against one saved room with undo. Add products from a link as true-size stand-ins and ask whether they fit. Disclosure — …"
 maintainer: devSebb
@@ -514,16 +516,16 @@ category: desktop
 requires_hermes: ">=0.21.0"
 version: "0.1.0"
 platforms: [macos, linux]
-docs_url: https://github.com/devSebb/room-studio#readme
-image: "https://raw.githubusercontent.com/devSebb/room-studio/<sha>/docs/banner.png"
+docs_url: https://github.com/devSebb/roomsmith#readme
+image: "https://raw.githubusercontent.com/devSebb/roomsmith/<sha>/docs/banner.png"
 screenshots:
-  - "https://raw.githubusercontent.com/devSebb/room-studio/<sha>/docs/editor.png"
+  - "https://raw.githubusercontent.com/devSebb/roomsmith/<sha>/docs/editor.png"
 readme: true
 known_issues:
   - "Sizes from a photo are estimates until you set one real measurement."
   - "iPhone HEIC photos must be exported as JPEG first."
 capabilities:
-  provides_tools: [room_studio_projects, room_studio_new_room, room_studio_from_photo, room_studio_inspect, room_studio_apply, room_studio_check, room_studio_add_product, room_studio_history, room_studio_export]
+  provides_tools: [roomsmith_projects, roomsmith_new_room, roomsmith_from_photo, roomsmith_inspect, roomsmith_apply, roomsmith_check, roomsmith_add_product, roomsmith_history, roomsmith_export]
   provides_hooks: [pre_llm_call]
   provides_middleware: []
   requires_env: []
@@ -563,13 +565,13 @@ These rules come from Sebb and Harvey (7 November) and override anything earlier
 |---|---|---|---|
 | MacBook (this machine) | **All implementation and all project Git writes.** Engine tests in a repo-local virtual environment. Editor dev harness in Chrome. | Everything in the repo; the unused local Hermes v0.21.0 as a lower-bound runtime check | Pushing without Sebb's go |
 | Mac mini (over Tailscale SSH as `jessica`) | **Runtime testing only, in an explicitly approved isolated Hermes home** with its own config, plugin-data, dependencies/venv and model sign-in. Later, Harvey's clean-install test. | Reading versions and docs; running the plugin inside the isolated home once approved | Installing into or copying code into the live `~/.hermes` or `~/.hermes/plugins/`; touching production profiles, shared dependencies, gateways, Mission Control or Tailscale; changing SSH config or keys without instruction |
-| GitHub `devSebb/room-studio` | Distribution. Final installs happen from a pinned commit with `hermes plugins install devSebb/room-studio --ref <sha>` | Public repo once Sebb says so | Self-updating; force-pushes to pinned history |
+| GitHub `devSebb/roomsmith` | Distribution. Final installs happen from a pinned commit with `hermes plugins install devSebb/roomsmith --ref <sha>` | Public repo once Sebb says so | Self-updating; force-pushes to pinned history |
 
 Code reaches the mini only through Git (clone of a pushed commit into the isolated home), never by copying a working tree.
 
-**Desktop against a remote backend (verified in the Desktop SDK docs, 7 Nov):** the Desktop app only scans the *local* machine's `~/.hermes/plugins` and `~/.hermes/desktop-plugins` for a `desktop/plugin.js`; the remote box's plugin folder is not reachable as a filesystem. So for a demo with Desktop on the MacBook talking to the Mini, the Desktop half is installed on the MacBook (or the whole package in the MacBook's `~/.hermes/plugins/room-studio`, desktop half enabled in Settings → Plugins) while `ctx.rest` reaches the Mini's `/api/plugins/room-studio/`. Alternatively Desktop runs on the Mini itself. Both are supported arrangements; which one we use is Sebb's call.
+**Desktop against a remote backend (verified in the Desktop SDK docs, 7 Nov):** the Desktop app only scans the *local* machine's `~/.hermes/plugins` and `~/.hermes/desktop-plugins` for a `desktop/plugin.js`; the remote box's plugin folder is not reachable as a filesystem. So for a demo with Desktop on the MacBook talking to the Mini, the Desktop half is installed on the MacBook (or the whole package in the MacBook's `~/.hermes/plugins/roomsmith`, desktop half enabled in Settings → Plugins) while `ctx.rest` reaches the Mini's `/api/plugins/roomsmith/`. Alternatively Desktop runs on the Mini itself. Both are supported arrangements; which one we use is Sebb's call.
 
-**Local lower-bound runtime (set up 7 Nov):** `.scratch/hermes-home/` is an isolated `HERMES_HOME` on the MacBook with `plugins/room-studio -> <repo>` and `plugins.enabled: [room-studio]`; `HERMES_HOME=<that> hermes dashboard --port 9119 --no-open` serves the tab from the MacBook's unused 0.21.0 install without touching its real `~/.hermes`. Harvey reviews immutable commits; C1/C2/C3 handoffs are kept substantial. Ordinary testing work is batched; only genuine access, safety, budget or scope blockers are escalated.
+**Local lower-bound runtime (set up 7 Nov):** `.scratch/hermes-home/` is an isolated `HERMES_HOME` on the MacBook with `plugins/roomsmith -> <repo>` and `plugins.enabled: [roomsmith]`; `HERMES_HOME=<that> hermes dashboard --port 9119 --no-open` serves the tab from the MacBook's unused 0.21.0 install without touching its real `~/.hermes`. Harvey reviews immutable commits; C1/C2/C3 handoffs are kept substantial. Ordinary testing work is batched; only genuine access, safety, budget or scope blockers are escalated.
 
 ---
 
@@ -616,13 +618,13 @@ Each milestone has a goal, deliverables, and exit criteria that are yes-or-no. T
 
 **Deliverables:** backend routes; editor core; dashboard tab; Desktop pane and page; build pipeline with lint.
 
-**Exit:** in Chrome (dashboard) and in Hermes Desktop: the room renders in both views; select, move with snapping, rotate, resize, delete, undo and redo work; an edit made by Hermes in chat animates in the editor within two seconds; an edit made by hand is visible to `room_studio_inspect` at once.
+**Exit:** in Chrome (dashboard) and in Hermes Desktop: the room renders in both views; select, move with snapping, rotate, resize, delete, undo and redo work; an edit made by Hermes in chat animates in the editor within two seconds; an edit made by hand is visible to `roomsmith_inspect` at once.
 
 ### M4 — Photo to draft, and calibration (Monday morning)
 
 **Goal:** the opening moment of the demo works on real photos.
 
-**Deliverables:** `room_studio_from_photo`, Route B in `new_room`, the layout builder with the fallback ladder, photo upload in the editor, the calibrate tool and operation, the draft badge.
+**Deliverables:** `roomsmith_from_photo`, Route B in `new_room`, the layout builder with the fallback ladder, photo upload in the editor, the calibrate tool and operation, the draft badge.
 
 **Exit:** the photo scorecard passes on five photos; every fallback rung is exercised by a test; calibrating one wall rescales everything.
 
@@ -630,7 +632,7 @@ Each milestone has a goal, deliverables, and exit criteria that are yes-or-no. T
 
 **Goal:** the plugin answers "will it fit?" and notices manual edits.
 
-**Deliverables:** `dims.py`, `room_studio_add_product`, `fitcheck` questions, issue markers in the editor, the `pre_llm_call` hook, GLB and JSON export.
+**Deliverables:** `dims.py`, `roomsmith_add_product`, `fitcheck` questions, issue markers in the editor, the `pre_llm_call` hook, GLB and JSON export.
 
 **Exit:** thirty real-world dimension strings parse correctly; pasting a product link in chat yields a true-size stand-in and a fit verdict with numbers; after dragging an object by hand, Hermes mentions the change unprompted in its next relevant answer and stays silent in unrelated sessions.
 
@@ -672,7 +674,7 @@ Never cut: the engine and its tests, the tools, move/rotate/resize with undo in 
 | 40–52 s | The armchair is dragged by hand. "Does anything block the door now?" Hermes: "The armchair is 30 cm inside the door swing." | Two-way awareness; real geometry |
 | 52–70 s | A product link pasted: "Would this sofa fit instead?" A true-size stand-in appears; Hermes gives the clearance in centimetres | Usefulness |
 | 70–82 s | Undo twice. Plan view with measurements. Export | Reliability and polish |
-| 82–90 s | "Room Studio — a Hermes plugin. No extra accounts." and the install line | The close |
+| 82–90 s | "Roomsmith — a Hermes plugin. No extra accounts." and the install line | The close |
 
 ---
 
@@ -715,9 +717,9 @@ Deferred from the v2 brief on purpose: the MacBook-to-Mini remote setup, payment
 
 1. **Go to start M0.** Model calls run on the Mini's subscription (GPT astra), so cost is not a factor there; the handful of MacBook-side calls, if any, go through the local OpenRouter key and are small.
 2. **SSH to the Mini.** This MacBook's public key (`~/.ssh/id_ed25519.pub`) must be added to `/Users/jessica/.ssh/authorized_keys` on the Mini by Sebb or Harvey. I will not change SSH config or keys myself.
-3. **The isolated Mini test home.** Approval for one directory on the Mini (proposed `/Users/jessica/room-studio-test/`) holding its own `HERMES_HOME`, config, plugin-data, Hermes copy/venv and model sign-in, used only for this plugin's runtime tests. Nothing in the live `~/.hermes` is read or written by it. Separately, a throwaway Hermes v0.23.0 (MacBook or that same test directory) for `hermes plugins validate`.
+3. **The isolated Mini test home.** Approval for one directory on the Mini (proposed `/Users/jessica/roomsmith-test/`) holding its own `HERMES_HOME`, config, plugin-data, Hermes copy/venv and model sign-in, used only for this plugin's runtime tests. Nothing in the live `~/.hermes` is read or written by it. Separately, a throwaway Hermes v0.23.0 (MacBook or that same test directory) for `hermes plugins validate`.
 4. **Photos.** Three to five photos of real rooms as JPEG. They stay out of git unless you say otherwise. One will appear in the demo video.
-5. **Repo name and licence.** Proposed: `devSebb/room-studio`, MIT. Public from Tuesday.
+5. **Repo name and licence.** Proposed: `devSebb/roomsmith`, MIT. Public from Tuesday.
 6. **Harvey.** Can Harvey do a clean-install test on the Mini on Tuesday?
 7. **The demo.** You record and post; I prepare the script, the room and the prompts.
 

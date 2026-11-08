@@ -12,4 +12,4 @@ bytes=$(du -sk "$tmp" | cut -f1)
 echo "clean export: $files files, ${bytes} KB (catalog limits: 400 files, 10240 KB, 1024 KB per file)"
 big=$(find "$tmp" -type f -size +1000k | sed "s#$tmp/##")
 if [ -n "$big" ]; then echo "!! files over 1 MB:"; echo "$big"; fi
-ROOM_STUDIO_DATA_DIR="$tmp/.data" hermes plugins doctor "$tmp" --ci
+ROOMSMITH_DATA_DIR="$tmp/.data" hermes plugins doctor "$tmp" --ci

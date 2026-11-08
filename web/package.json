@@ -1,8 +1,8 @@
 {
-  "name": "room-studio-web",
+  "name": "roomsmith-web",
   "private": true,
   "version": "0.1.0",
-  "description": "Source for Room Studio's editor: built into desktop/plugin.js and dashboard/dist/index.js",
+  "description": "Source for Roomsmith's editor: built into desktop/plugin.js and dashboard/dist/index.js",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",

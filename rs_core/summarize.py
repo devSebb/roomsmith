@@ -169,7 +169,7 @@ def compact(scene: dict, issues: list[dict] | None = None, revision: int | None 
 
 
 def shopping_list(scene: dict) -> str:
-    lines = [f"Room Studio — {scene['project']['name']}", ""]
+    lines = [f"Roomsmith — {scene['project']['name']}", ""]
     for obj in scene["objects"]:
         w, h, d = obj["dimensions_m"]
         line = f"- {obj['name']}: {_f(w)} x {_f(h)} x {_f(d)} m (w x h x d)"

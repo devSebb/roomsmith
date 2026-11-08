@@ -14,7 +14,7 @@ const watch = process.argv.includes('--watch')
 const devOnly = process.argv.includes('--dev')
 const version = JSON.parse(readFileSync(resolve(here, 'package.json'), 'utf8')).version
 
-const banner = (what) => `/* Room Studio ${version} — ${what}. Built from web/ with esbuild; do not edit by hand. Bundles three.js (MIT, see THIRD_PARTY_NOTICES.md). */`
+const banner = (what) => `/* Roomsmith ${version} — ${what}. Built from web/ with esbuild; do not edit by hand. Bundles three.js (MIT, see THIRD_PARTY_NOTICES.md). */`
 
 const common = {
   bundle: true,

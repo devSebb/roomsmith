@@ -1,5 +1,5 @@
-"""Dev server: the real backend router under /api/plugins/room-studio plus the
-harness page. Data goes to a scratch folder (ROOM_STUDIO_DATA_DIR) so nothing
+"""Dev server: the real backend router under /api/plugins/roomsmith plus the
+harness page. Data goes to a scratch folder (ROOMSMITH_DATA_DIR) so nothing
 touches a Hermes home.
 
     .venv/bin/python web/dev/server.py [--port 8765] [--data /tmp/rs-dev]
@@ -21,7 +21,7 @@ def main() -> None:
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--data", default=str(ROOT / ".scratch" / "dev-data"))
     args = ap.parse_args()
-    os.environ["ROOM_STUDIO_DATA_DIR"] = args.data
+    os.environ["ROOMSMITH_DATA_DIR"] = args.data
     Path(args.data).mkdir(parents=True, exist_ok=True)
 
     import uvicorn
@@ -29,13 +29,13 @@ def main() -> None:
     from fastapi.responses import FileResponse
     from fastapi.staticfiles import StaticFiles
 
-    spec = importlib.util.spec_from_file_location("hermes_dashboard_plugin_room_studio", ROOT / "dashboard" / "plugin_api.py")
+    spec = importlib.util.spec_from_file_location("hermes_dashboard_plugin_roomsmith", ROOT / "dashboard" / "plugin_api.py")
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)
 
-    app = FastAPI(title="Room Studio dev")
-    app.include_router(mod.router, prefix="/api/plugins/room-studio")
+    app = FastAPI(title="Roomsmith dev")
+    app.include_router(mod.router, prefix="/api/plugins/roomsmith")
     dev = ROOT / "web" / "dev"
 
     @app.get("/")
@@ -43,7 +43,7 @@ def main() -> None:
         return FileResponse(dev / "index.html")
 
     app.mount("/", StaticFiles(directory=str(dev)), name="dev")
-    print(f"Room Studio dev harness: http://127.0.0.1:{args.port}/  (data in {args.data})")
+    print(f"Roomsmith dev harness: http://127.0.0.1:{args.port}/  (data in {args.data})")
     uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
 
 

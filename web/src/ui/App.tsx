@@ -181,7 +181,7 @@ function NewRoom({ store, api, onDone, compact }: { store: Store; api: Api; onDo
     } catch (e: any) { store.toast('error', e?.message || 'Upload failed') } finally { setBusy(false) }
   }
   const doImport = async (f: File) => {
-    try { const j = JSON.parse(await f.text()); await store.createRoom({ import: j, name: j?.scene?.project?.name || f.name.replace(/\.room\.json$|\.json$/, '') }); onDone?.() } catch (e: any) { store.toast('error', 'Not a Room Studio file') }
+    try { const j = JSON.parse(await f.text()); await store.createRoom({ import: j, name: j?.scene?.project?.name || f.name.replace(/\.room\.json$|\.json$/, '') }); onDone?.() } catch (e: any) { store.toast('error', 'Not a Roomsmith file') }
   }
   return (
     <div className="rs-sec" style={{ width: compact ? 280 : undefined, textAlign: 'left' }}>

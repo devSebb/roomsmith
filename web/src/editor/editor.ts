@@ -75,7 +75,7 @@ export class Editor {
     el.style.height = '100%'
     el.style.touchAction = 'none'
     el.tabIndex = 0
-    el.setAttribute('aria-label', 'Room Studio 3D editor')
+    el.setAttribute('aria-label', 'Roomsmith 3D editor')
     container.appendChild(el)
 
     this.persp = new THREE.PerspectiveCamera(50, 1, 0.05, 200)

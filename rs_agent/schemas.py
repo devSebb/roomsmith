@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-TOOLSET = "room_studio"
+TOOLSET = "roomsmith"
 
 _PLACE = {
     "type": "object",
@@ -39,10 +39,10 @@ _DIMS = {
 }
 
 PROJECTS = {
-    "name": "room_studio_projects",
+    "name": "roomsmith_projects",
     "description": (
         "List the user's rooms, switch the active room, rename or delete one, and learn how to open the editor. "
-        "Most other room_studio tools act on the active room when project_id is omitted."
+        "Most other roomsmith tools act on the active room when project_id is omitted."
     ),
     "parameters": {
         "type": "object",
@@ -55,7 +55,7 @@ PROJECTS = {
 }
 
 NEW_ROOM = {
-    "name": "room_studio_new_room",
+    "name": "roomsmith_new_room",
     "description": (
         "Create a new room. Either give the footprint (width_m along the back wall, depth_m, height_m) for a measured room, "
         "or give a `layout` draft when you can SEE a photo of the room yourself: estimate the room and its furniture in the draft format "
@@ -86,12 +86,12 @@ NEW_ROOM = {
 }
 
 FROM_PHOTO = {
-    "name": "room_studio_from_photo",
+    "name": "roomsmith_from_photo",
     "description": (
         "Build a draft room from one to four photo files on disk (JPEG/PNG/WebP paths, or photo ids uploaded through the editor). "
         "The plugin sends the images to the user's Hermes model and builds an editable 3D room: walls, door/window guesses, furniture as sized boxes. "
-        "Sizes are estimates until the user gives one real measurement (then use room_studio_apply with op 'calibrate'). "
-        "If you can see the photo yourself in this conversation, you may instead call room_studio_new_room with a `layout`."
+        "Sizes are estimates until the user gives one real measurement (then use roomsmith_apply with op 'calibrate'). "
+        "If you can see the photo yourself in this conversation, you may instead call roomsmith_new_room with a `layout`."
     ),
     "parameters": {
         "type": "object",
@@ -105,7 +105,7 @@ FROM_PHOTO = {
 }
 
 INSPECT = {
-    "name": "room_studio_inspect",
+    "name": "roomsmith_inspect",
     "description": (
         "Read the current room: size, walls (ids, labels, lengths), openings, every object with id, size, position and facing, the revision number, "
         "and open issues. Call this before editing so you have the ids and the current revision. detail 'full' returns the raw scene JSON too."
@@ -120,7 +120,7 @@ INSPECT = {
 }
 
 APPLY = {
-    "name": "room_studio_apply",
+    "name": "roomsmith_apply",
     "description": (
         "Edit the room with one atomic batch of operations (all apply or none). Pass expected_revision from your last inspect; "
         "on 'revision_conflict' re-inspect and retry. Operations (each an object with 'op'):\n"
@@ -184,7 +184,7 @@ APPLY["parameters"]["properties"]["operations"]["items"] = {
 }
 
 CHECK = {
-    "name": "room_studio_check",
+    "name": "roomsmith_check",
     "description": (
         "Fit and clearance questions, answered by geometry (quote the numbers, do not estimate). question:\n"
         "- 'issues': all current issues in the room\n"
@@ -208,7 +208,7 @@ CHECK = {
 }
 
 ADD_PRODUCT = {
-    "name": "room_studio_add_product",
+    "name": "roomsmith_add_product",
     "description": (
         "Add a real product as a true-size stand-in box. First read the product page with your own web tools and extract the title, the dimensions text "
         "exactly as written (e.g. 'Width: 228 cm, Depth: 95 cm, Height: 83 cm' or '71\" W x 35\" D x 30\" H'), the price and a product image URL; "
@@ -235,7 +235,7 @@ ADD_PRODUCT = {
 }
 
 HISTORY = {
-    "name": "room_studio_history",
+    "name": "roomsmith_history",
     "description": "Undo or redo the last change(s), or list recent revisions with who made them (you or the user in the editor).",
     "parameters": {
         "type": "object",
@@ -249,7 +249,7 @@ HISTORY = {
 }
 
 EXPORT = {
-    "name": "room_studio_export",
+    "name": "roomsmith_export",
     "description": "Write the room to a file and return its path. format: 'json' (re-importable), 'glb' (3D model for Blender/Quick Look), 'summary' (text list with sizes and product links).",
     "parameters": {
         "type": "object",

@@ -57,8 +57,8 @@ class RoomService:
 
     def _no_project(self, project_id: str | None) -> dict:
         if project_id:
-            return _err("not_found", f"No room {project_id!r}. Call room_studio_projects to list rooms.")
-        return _err("no_active_room", "There is no room yet. Create one with room_studio_new_room or room_studio_from_photo.")
+            return _err("not_found", f"No room {project_id!r}. Call roomsmith_projects to list rooms.")
+        return _err("no_active_room", "There is no room yet. Create one with roomsmith_new_room or roomsmith_from_photo.")
 
     @staticmethod
     def _actor(actor: str | None) -> str:
@@ -234,7 +234,7 @@ class RoomService:
             except NotFound as e:
                 return _err("not_found", str(e))
             if expected is not None and expected != current:
-                return _err("revision_conflict", f"The room changed since you last looked: you expected revision {expected}, it is {current}. Re-read it (room_studio_inspect) and retry.", expected_revision=expected, current_revision=current)
+                return _err("revision_conflict", f"The room changed since you last looked: you expected revision {expected}, it is {current}. Re-read it (roomsmith_inspect) and retry.", expected_revision=expected, current_revision=current)
             try:
                 batch = ops.apply_operations(scene, operations)
             except SceneError as e:
@@ -458,7 +458,7 @@ class RoomService:
         folder.mkdir(parents=True, exist_ok=True)
         if fmt == "json":
             path = folder / f"{safe}-r{rev}.room.json"
-            path.write_text(json.dumps({"room_studio": 1, "schema_version": scene["schema_version"], "revision": rev, "scene": scene}, indent=2))
+            path.write_text(json.dumps({"roomsmith": 1, "schema_version": scene["schema_version"], "revision": rev, "scene": scene}, indent=2))
         elif fmt == "glb":
             path = folder / f"{safe}-r{rev}.glb"
             path.write_bytes(export_glb.scene_to_glb(scene))
@@ -479,14 +479,14 @@ class RoomService:
         if fmt == "glb":
             return export_glb.scene_to_glb(scene), "model/gltf-binary", f"{safe}-r{rev}.glb"
         if fmt == "json":
-            return json.dumps({"room_studio": 1, "schema_version": scene["schema_version"], "revision": rev, "scene": scene}, indent=2).encode(), "application/json", f"{safe}-r{rev}.room.json"
+            return json.dumps({"roomsmith": 1, "schema_version": scene["schema_version"], "revision": rev, "scene": scene}, indent=2).encode(), "application/json", f"{safe}-r{rev}.room.json"
         issues = validate.issues(scene)
         return (summarize.summary_text(scene, issues, rev) + "\n\n" + summarize.shopping_list(scene) + "\n").encode(), "text/plain", f"{safe}-r{rev}.txt"
 
     def import_json(self, payload: dict, name: str | None = None, actor: str = "user") -> dict:
         scene = payload.get("scene") if isinstance(payload, dict) and "scene" in payload else payload
         if not isinstance(scene, dict) or "room" not in scene:
-            return _err("invalid_value", "Not a Room Studio JSON file")
+            return _err("invalid_value", "Not a Roomsmith JSON file")
         scene = m.clone(scene)
         pid = m.new_project_id()
         scene["project"] = {"id": pid, "name": name or scene.get("project", {}).get("name") or "Imported room", "units": "m"}

@@ -1,10 +1,10 @@
 """Where the plugin keeps its data.
 
 Resolution order:
-1. ``ROOM_STUDIO_DATA_DIR`` environment variable (tests, isolated runs)
-2. Hermes's public ``plugins.plugin_storage.plugin_data_dir("room-studio")``
-   -> ``<hermes home>/plugin-data/room-studio/`` (follows the active profile)
-3. ``$HERMES_HOME/plugin-data/room-studio`` or ``~/.hermes/plugin-data/room-studio``
+1. ``ROOMSMITH_DATA_DIR`` environment variable (tests, isolated runs)
+2. Hermes's public ``plugins.plugin_storage.plugin_data_dir("roomsmith")``
+   -> ``<hermes home>/plugin-data/roomsmith/`` (follows the active profile)
+3. ``$HERMES_HOME/plugin-data/roomsmith`` or ``~/.hermes/plugin-data/roomsmith``
 
 Imports of Hermes are lazy so this module also works outside Hermes.
 """
@@ -14,12 +14,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-PLUGIN_NAME = "room-studio"
+PLUGIN_NAME = "roomsmith"
 DB_FILENAME = "data.db"
 
 
 def data_dir() -> Path:
-    override = os.environ.get("ROOM_STUDIO_DATA_DIR")
+    override = os.environ.get("ROOMSMITH_DATA_DIR")
     if override:
         p = Path(override).expanduser()
         p.mkdir(parents=True, exist_ok=True)

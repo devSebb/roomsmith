@@ -1,4 +1,4 @@
-"""Room Studio — a Hermes Agent plugin.
+"""Roomsmith — a Hermes Agent plugin.
 
 Turn a room photo into an editable 3D room, edit it by hand in the editor or
 by talking to Hermes, add real products as true-size stand-ins, and check
@@ -37,15 +37,15 @@ def register(ctx) -> None:
     _ctx = ctx
 
     handlers = {
-        "room_studio_projects": tools.projects,
-        "room_studio_new_room": tools.new_room,
-        "room_studio_from_photo": tools.from_photo_handler(_get_ctx),
-        "room_studio_inspect": tools.inspect,
-        "room_studio_apply": tools.apply,
-        "room_studio_check": tools.check,
-        "room_studio_add_product": tools.add_product,
-        "room_studio_history": tools.history,
-        "room_studio_export": tools.export,
+        "roomsmith_projects": tools.projects,
+        "roomsmith_new_room": tools.new_room,
+        "roomsmith_from_photo": tools.from_photo_handler(_get_ctx),
+        "roomsmith_inspect": tools.inspect,
+        "roomsmith_apply": tools.apply,
+        "roomsmith_check": tools.check,
+        "roomsmith_add_product": tools.add_product,
+        "roomsmith_history": tools.history,
+        "roomsmith_export": tools.export,
     }
     for spec in schemas.ALL:
         ctx.register_tool(
@@ -60,7 +60,7 @@ def register(ctx) -> None:
     ctx.register_command(
         name="room",
         handler=tools.slash_room,
-        description="Show the active Room Studio room (or switch: /room <name>)",
+        description="Show the active Roomsmith room (or switch: /room <name>)",
         args_hint="[name]",
     )
 
@@ -70,7 +70,7 @@ def register(ctx) -> None:
             ctx.register_skill(
                 name="room-design",
                 path=skill,
-                description="How to design a room with Room Studio: inspect, edit, check fit, add products, calibrate.",
+                description="How to design a room with Roomsmith: inspect, edit, check fit, add products, calibrate.",
             )
         except Exception:
             pass  # a host without plugin skills still gets the tools

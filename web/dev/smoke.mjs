@@ -3,7 +3,7 @@
 import { mkdirSync } from 'node:fs'
 
 const OUT = '.scratch/shots'
-const API = 'http://127.0.0.1:8765/api/plugins/room-studio'
+const API = 'http://127.0.0.1:8765/api/plugins/roomsmith'
 const assert = (c, m) => { if (!c) throw new Error('ASSERT: ' + m) }
 const head = async pid => (await (await fetch(`${API}/projects/${pid}/head`)).json())
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Room Studio — dev harness</title>
+<title>Roomsmith — dev harness</title>
 <style>
   html, body { margin: 0; height: 100%; }
   body { font: 13px system-ui, sans-serif; color: #e6e8eb; background: #1b1d21; --ui-accent: #4f8cff; }
@@ -13,9 +13,9 @@
 </style>
 </head>
 <body>
-<div id="bar"><b>Room Studio dev</b> <span>backend: <code id="base"></code></span> <button onclick="document.body.classList.toggle('light')">toggle theme</button></div>
+<div id="bar"><b>Roomsmith dev</b> <span>backend: <code id="base"></code></span> <button onclick="document.body.classList.toggle('light')">toggle theme</button></div>
 <div id="root"></div>
-<script>document.getElementById('base').textContent = window.__RS_API_BASE__ || '/api/plugins/room-studio'</script>
+<script>document.getElementById('base').textContent = window.__RS_API_BASE__ || '/api/plugins/roomsmith'</script>
 <script src="./dev.js"></script>
 </body>
 </html>

@@ -7,7 +7,7 @@ import { Api, type Transport } from './api'
 import { App } from './ui/App'
 import type { State } from './store'
 
-const ID = 'room-studio'
+const ID = 'roomsmith'
 const $status = atom<{ name: string; revision: number; issues: number; has: boolean }>({ name: '', revision: 0, issues: 0, has: false })
 
 function parseThrown(e: any): any | null {
@@ -71,7 +71,7 @@ function onState(s: State) {
   $status.set({ name: s.scene?.project.name || '', revision: s.revision, issues: s.issues.filter(i => i.code !== 'uncalibrated').length, has: !!s.scene })
 }
 
-function RoomStudio({ ctx, full }: { ctx: any; full?: boolean }) {
+function Roomsmith({ ctx, full }: { ctx: any; full?: boolean }) {
   const api = React.useMemo(() => new Api(transport(ctx)), [ctx])
   const persist = React.useMemo(() => makePersist(ctx), [ctx])
   return React.createElement('div', { style: { height: '100%', minHeight: full ? '100%' : 360, display: 'flex', flexDirection: 'column' } },
@@ -84,38 +84,38 @@ function StatusChip() {
   return React.createElement('button', {
     type: 'button',
     className: 'px-1.5 text-[0.6875rem] text-(--ui-text-tertiary)',
-    title: `Room Studio: ${s.name}, revision ${s.revision}`,
-    onClick: () => host.navigate('/room-studio'),
+    title: `Roomsmith: ${s.name}, revision ${s.revision}`,
+    onClick: () => host.navigate('/roomsmith'),
   }, `🛋 ${s.name}${s.issues ? ` · ${s.issues} issue${s.issues === 1 ? '' : 's'}` : ''}`)
 }
 
 export default {
   id: ID,
-  name: 'Room Studio',
+  name: 'Roomsmith',
   register(ctx: any) {
     ctx.registerMany([
       {
         id: 'pane',
         area: PANES_AREA,
-        title: 'Room Studio',
+        title: 'Roomsmith',
         data: { placement: 'right', width: '560px' },
-        render: () => React.createElement(RoomStudio, { ctx }),
+        render: () => React.createElement(Roomsmith, { ctx }),
       },
       {
         id: 'page',
         area: ROUTES_AREA,
-        data: { path: '/room-studio' },
-        render: () => React.createElement(RoomStudio, { ctx, full: true }),
+        data: { path: '/roomsmith' },
+        render: () => React.createElement(Roomsmith, { ctx, full: true }),
       },
       {
         id: 'nav',
         area: SIDEBAR_NAV_AREA,
-        data: { path: '/room-studio', label: 'Room Studio', codicon: 'home' },
+        data: { path: '/roomsmith', label: 'Roomsmith', codicon: 'home' },
       },
       {
         id: 'open',
         area: PALETTE_AREA,
-        data: { id: 'room-studio.open', label: 'Open Room Studio', keywords: ['room', 'furniture', '3d', 'studio'], run: () => host.navigate('/room-studio') },
+        data: { id: 'roomsmith.open', label: 'Open Roomsmith', keywords: ['room', 'furniture', '3d', 'studio'], run: () => host.navigate('/roomsmith') },
       },
       {
         id: 'chip',

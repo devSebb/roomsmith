@@ -262,7 +262,7 @@ export function friendly(e: any): string {
   if (e instanceof ApiError) return e.message
   if (e?.name === 'AbortError') return 'The request timed out.'
   if (typeof e?.message === 'string') {
-    if (/Failed to fetch|NetworkError|ECONNREFUSED/.test(e.message)) return 'Cannot reach the Room Studio backend. Is the plugin enabled and the dashboard/gateway running?'
+    if (/Failed to fetch|NetworkError|ECONNREFUSED/.test(e.message)) return 'Cannot reach the Roomsmith backend. Is the plugin enabled and the dashboard/gateway running?'
     return e.message
   }
   return String(e)

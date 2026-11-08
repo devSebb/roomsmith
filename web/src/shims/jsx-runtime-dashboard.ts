@@ -1,6 +1,6 @@
 // `react/jsx-runtime` for the dashboard bundle, built on the host's React.
 const R = (window as any).__HERMES_PLUGIN_SDK__?.React
-if (!R) throw new Error('Room Studio: window.__HERMES_PLUGIN_SDK__.React is missing')
+if (!R) throw new Error('Roomsmith: window.__HERMES_PLUGIN_SDK__.React is missing')
 export const Fragment = R.Fragment
 function make(type: any, props: any, key?: any) {
   const { children, ...rest } = props || {}

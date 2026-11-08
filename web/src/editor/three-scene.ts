@@ -1,4 +1,4 @@
-// Builds and updates three.js meshes from a Room Studio scene.
+// Builds and updates three.js meshes from a Roomsmith scene.
 // Objects are kept as a map so revisions can animate instead of rebuilding.
 
 import * as THREE from 'three'

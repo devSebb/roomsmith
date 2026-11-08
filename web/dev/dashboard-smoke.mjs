@@ -1,4 +1,4 @@
-// Opens the real Hermes dashboard, finds the Room Studio tab, exercises it.
+// Opens the real Hermes dashboard, finds the Roomsmith tab, exercises it.
 import { mkdirSync } from 'node:fs'
 const OUT = '.scratch/shots'
 const assert = (c, m) => { if (!c) throw new Error('ASSERT: ' + m) }
@@ -9,13 +9,13 @@ export default async function (page) {
   await page.shot(`${OUT}/d1-dashboard.png`)
   const nav = await page.eval(`[...document.querySelectorAll('a, button')].map(a => (a.textContent || '').trim()).filter(t => t && t.length < 30)`)
   console.log('nav:', JSON.stringify(nav.slice(0, 40)))
-  const href = await page.eval(`([...document.querySelectorAll('a')].find(a => /room studio/i.test(a.textContent)) || {}).getAttribute?.('href')`)
+  const href = await page.eval(`([...document.querySelectorAll('a')].find(a => /roomsmith/i.test(a.textContent)) || {}).getAttribute?.('href')`)
   console.log('tab href:', href)
-  assert(href, 'Room Studio tab present in the nav')
-  await page.eval(`[...document.querySelectorAll('a')].find(a => /room studio/i.test(a.textContent)).click()`)
+  assert(href, 'Roomsmith tab present in the nav')
+  await page.eval(`[...document.querySelectorAll('a')].find(a => /roomsmith/i.test(a.textContent)).click()`)
   for (let i = 0; i < 40; i++) { if (await page.eval(`!!document.querySelector('.rs-root')`)) break; await page.sleep(250) }
   await page.sleep(1500)
-  await page.shot(`${OUT}/d2-room-studio-tab.png`)
+  await page.shot(`${OUT}/d2-roomsmith-tab.png`)
   const mounted = await page.eval(`!!document.querySelector('.rs-root canvas')`)
   assert(mounted, 'editor mounted inside the dashboard')
   const empty = await page.eval(`!!document.querySelector('.rs-empty')`)

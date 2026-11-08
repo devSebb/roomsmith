@@ -79,7 +79,7 @@ def _trim_inspect(out: dict) -> dict:
     return keep
 
 
-EDITOR_HINT = "The user can open this room in Hermes Desktop (Room Studio pane) or the dashboard's Room Studio tab; edits there show up here."
+EDITOR_HINT = "The user can open this room in Hermes Desktop (Roomsmith pane) or the dashboard's Roomsmith tab; edits there show up here."
 
 
 @_guard
@@ -221,4 +221,4 @@ def slash_room(raw_args: str = "") -> str:
         lines.append(EDITOR_HINT)
         return "\n".join(lines)
     except Exception as e:  # noqa: BLE001
-        return f"Room Studio error: {e}"
+        return f"Roomsmith error: {e}"

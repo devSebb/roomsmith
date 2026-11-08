@@ -1,4 +1,4 @@
-"""Room Studio backend routes. Mounted by Hermes at /api/plugins/room-studio/.
+"""Roomsmith backend routes. Mounted by Hermes at /api/plugins/roomsmith/.
 
 This file is imported standalone by the dashboard (not as part of a package),
 so it uses no relative imports. It puts the plugin root on sys.path and uses

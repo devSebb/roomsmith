@@ -1,11 +1,11 @@
 {
-  "name": "room-studio",
-  "label": "Room Studio",
+  "name": "roomsmith",
+  "label": "Roomsmith",
   "description": "Photo to editable 3D room; edit by hand or with Hermes; add products at true size; check what fits.",
   "icon": "Package",
   "version": "0.1.0",
   "tab": {
-    "path": "/room-studio",
+    "path": "/roomsmith",
     "position": "end"
   },
   "entry": "dist/index.js",

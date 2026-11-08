@@ -1,11 +1,11 @@
-// Dashboard shell: registers the Room Studio tab with the dashboard's plugin SDK.
+// Dashboard shell: registers the Roomsmith tab with the dashboard's plugin SDK.
 // Built as an IIFE; React comes from window.__HERMES_PLUGIN_SDK__ via shims.
 import React from 'react'
 import { Api, type Transport } from './api'
 import { App } from './ui/App'
 
 const SDK = (window as any).__HERMES_PLUGIN_SDK__
-const NS = '/api/plugins/room-studio'
+const NS = '/api/plugins/roomsmith'
 const TOKEN_HEADER = 'X-Hermes-Session-Token'
 
 function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
@@ -58,13 +58,13 @@ function transport(): Transport {
 }
 
 const persist = {
-  get: (k: string) => { try { return localStorage.getItem('room-studio.' + k) } catch { return null } },
-  set: (k: string, v: string) => { try { localStorage.setItem('room-studio.' + k, v) } catch { /* ignore */ } },
+  get: (k: string) => { try { return localStorage.getItem('roomsmith.' + k) } catch { return null } },
+  set: (k: string, v: string) => { try { localStorage.setItem('roomsmith.' + k, v) } catch { /* ignore */ } },
 }
 
-function RoomStudioTab() {
+function RoomsmithTab() {
   const api = React.useMemo(() => new Api(transport()), [])
   return React.createElement('div', { style: { height: 'calc(100vh - 110px)', minHeight: 480 } }, React.createElement(App, { api, shell: 'dashboard', persist }))
 }
 
-;(window as any).__HERMES_PLUGINS__.register('room-studio', RoomStudioTab)
+;(window as any).__HERMES_PLUGINS__.register('roomsmith', RoomsmithTab)
