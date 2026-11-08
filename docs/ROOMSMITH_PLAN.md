@@ -614,7 +614,7 @@ Each milestone has a goal, deliverables, and exit criteria that are yes-or-no. T
 
 **Exit:** in a real Hermes chat, with no editor: create a 4 × 5 m room, add five objects, "swap the sofa and the desk", "put the bookshelf against the north wall", ask "does anything overlap?", undo twice. Each step changes the saved scene as expected. Doctor passes.
 
-### M3 — The editor (Sunday) — **core done Friday 7 Nov** (commit 3fd350b); Desktop-app run and polish remain
+### M3 — The editor (Sunday) — **done 8 Nov**: core 7 Nov (3fd350b); Desktop pane + page verified live 8 Nov, editor follows agent-created rooms, 60 objects at 60 fps
 
 **Goal:** see and edit the room by hand, live with Hermes.
 
@@ -622,7 +622,7 @@ Each milestone has a goal, deliverables, and exit criteria that are yes-or-no. T
 
 **Exit:** in Chrome (dashboard) and in Hermes Desktop: the room renders in both views; select, move with snapping, rotate, resize, delete, undo and redo work; an edit made by Hermes in chat animates in the editor within two seconds; an edit made by hand is visible to `roomsmith_inspect` at once.
 
-### M4 — Photo to draft, and calibration (Monday morning)
+### M4 — Photo to draft, and calibration (Monday morning) — **code done 8 Nov**; the model-read half (S2) and the photo scorecard await the Mini
 
 **Goal:** the opening moment of the demo works on real photos.
 
@@ -630,7 +630,7 @@ Each milestone has a goal, deliverables, and exit criteria that are yes-or-no. T
 
 **Exit:** the photo scorecard passes on five photos; every fallback rung is exercised by a test; calibrating one wall rescales everything.
 
-### M5 — Products, fit check, awareness (Monday afternoon)
+### M5 — Products, fit check, awareness (Monday afternoon) — **done 8 Nov** through the tool layer (`tests/test_demo_script.py`); live chat verification on the Mini pending
 
 **Goal:** the plugin answers "will it fit?" and notices manual edits.
 
@@ -638,7 +638,7 @@ Each milestone has a goal, deliverables, and exit criteria that are yes-or-no. T
 
 **Exit:** thirty real-world dimension strings parse correctly; pasting a product link in chat yields a true-size stand-in and a fit verdict with numbers; after dragging an object by hand, Hermes mentions the change unprompted in its next relevant answer and stays silent in unrelated sessions.
 
-### M6 — Polish and hardening (Tuesday morning)
+### M6 — Polish and hardening (Tuesday morning) — **in progress 8 Nov**: CI, README, screenshots, banner, changelog, licence, notices, known issues, perf pass done; demo-script test passes; `validate` passes on 0.23 in CI; Desktop checklist with Sebb watching still to do
 
 **Goal:** it feels finished and survives a stranger.
 
