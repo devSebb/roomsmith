@@ -1,5 +1,7 @@
 # Roomsmith — a Hermes Agent plugin
 
+[![validate](https://github.com/devSebb/roomsmith/actions/workflows/validate.yml/badge.svg)](https://github.com/devSebb/roomsmith/actions/workflows/validate.yml) — engine tests on Python 3.11/3.14, editor tests, and Hermes's own `plugins doctor --ci` + `plugins validate` on every push.
+
 Turn a photo of a room into an editable 3D room. Move the furniture by hand in
 the editor or by talking to Hermes — both edit the same room, with undo. Paste a
 product link and it appears at its true size, so you can see whether it fits
