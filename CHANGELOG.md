@@ -33,3 +33,6 @@ Built 2026-11-07, hackathon week.
   desk, dresser, shelf etc. is placed on top of it (surface mount) instead of
   overlapping it on the floor — the first real photo had a plant on a side table.
 - CI (`validate.yml`) and the catalog entry draft (`catalog/roomsmith.yaml`).
+- `tests/test_demo_script.py`: the §18a demo run beat by beat through the tool
+  handlers (photo → calibrate → swap/move → manual drag → blocks-door check →
+  product → undo → export); 86 tests.

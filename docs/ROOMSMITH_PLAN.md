@@ -644,7 +644,7 @@ Each milestone has a goal, deliverables, and exit criteria that are yes-or-no. T
 
 **Deliverables:** sample room, empty and error states, toasts, keyboard shortcuts, performance pass (60 objects stay smooth), README with install and enable steps, screenshots and banner, changelog, licence, notices, CI workflow, known issues.
 
-**Exit:** the twelve-prompt conversation script passes end to end; `hermes plugins validate` passes on v0.23.0 with no failures and every warning read; the Desktop checklist passes with Sebb watching; no file over 1 MB.
+**Exit:** the demo script (§18a) passes end to end through the tool layer (`tests/test_demo_script.py`, added 8 Nov — every beat from photo to export, incl. the manual drag the hook must report); `hermes plugins validate` passes on v0.23.0 with no failures and every warning read; the Desktop checklist passes with Sebb watching; no file over 1 MB.
 
 ### M7 — Ship (Tuesday afternoon to Wednesday noon)
 
