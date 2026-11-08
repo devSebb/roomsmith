@@ -1,0 +1,30 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Roomsmith banner</title>
+<style>
+  html, body { margin: 0; background: #0b0e14; overflow: hidden; width: 1280px; height: 640px; }
+  .b { position: relative; width: 1280px; height: 640px; overflow: hidden; background: #0b0e14; color: #e8ecf2;
+       font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Inter, system-ui, sans-serif; }
+  .shot { position: absolute; right: -40px; top: 56px; width: 860px; height: 620px; border-radius: 14px; overflow: hidden;
+          box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.08); transform: rotate(-2deg); }
+  .shot img { position: absolute; left: -380px; top: -150px; width: 1500px; }
+  .fade { position: absolute; inset: 0; background: linear-gradient(90deg, #0b0e14 0%, #0b0e14 30%, rgba(11,14,20,0) 62%); }
+  .text { position: absolute; left: 64px; top: 120px; width: 560px; }
+  .kicker { font-size: 18px; letter-spacing: .14em; text-transform: uppercase; color: #8fb3ff; font-weight: 600; }
+  h1 { font-size: 92px; margin: 10px 0 18px; letter-spacing: -0.03em; font-weight: 700; line-height: 1; }
+  .tag { font-size: 27px; line-height: 1.3; color: #c7cfdb; margin: 0 0 28px; }
+  .pills { display: flex; gap: 10px; flex-wrap: wrap; }
+  .pill { font-size: 16px; padding: 7px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: #dfe5ee; }
+  .foot { position: absolute; left: 64px; bottom: 44px; font-size: 17px; color: #8a93a3; }
+  .foot code { color: #cfd6e0; background: rgba(255,255,255,.06); padding: 3px 8px; border-radius: 6px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 16px; }
+</style></head>
+<body><div class="b">
+  <div class="shot"><img src="../screenshots/desktop-page.png" alt=""></div>
+  <div class="fade"></div>
+  <div class="text">
+    <div class="kicker">Hermes Agent plugin</div>
+    <h1>Roomsmith</h1>
+    <p class="tag">A photo becomes an editable 3D room. Move things by hand or ask Hermes — same room, with undo. Real products at true size. Will it fit?</p>
+    <div class="pills"><span class="pill">Photo → room</span><span class="pill">Live editor in Desktop</span><span class="pill">Fit checks</span><span class="pill">No extra accounts</span></div>
+  </div>
+  <div class="foot"><code>hermes plugins install devSebb/roomsmith</code></div>
+</div></body></html>
