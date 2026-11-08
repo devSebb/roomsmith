@@ -129,6 +129,7 @@ export class Store {
         }
         if (h.active_project_id !== undefined) this.knownActive = h.active_project_id
         if (h.changed && h.revision > this.state.revision && this.pending === 0) await this.pull(h)
+        else if (!h.changed) void this.refreshProjects() // idle tick: keep the room list current (renames/deletes elsewhere)
       } catch (e: any) {
         if (token !== this.pollAbort) break
         if (e instanceof ApiError && e.code === 'not_found') { this.set({ error: 'This room was deleted.', scene: null, projectId: null }); break }

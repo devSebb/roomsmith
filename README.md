@@ -9,6 +9,12 @@ before you buy.
 
 **Status: 0.1.0, in development for the Hermes Agent Plugin Hackathon.**
 
+![The Roomsmith page in Hermes Desktop: a room built from a photo — French doors on the back wall, a futon along the right wall, warnings on the objects that clip the door's clear zone](docs/screenshots/desktop-page.png)
+
+*Hermes read a photo and built this room; the editor opened it the moment the tool finished (below, as the pane beside the chat).*
+
+![The Roomsmith pane next to the Hermes chat, with the toast "Hermes opened Studio (from photo)"](docs/screenshots/desktop-pane-follow.png)
+
 ## What it does
 
 - **Photo → draft room.** Hermes reads a photo and builds walls, door and window
@@ -17,7 +23,8 @@ before you buy.
 - **One room, two editors.** A live 3D editor (Hermes Desktop pane, or a tab in
   `hermes dashboard`) and nine agent tools write the same saved room. Every edit
   is a numbered revision with undo; Hermes sees what you changed by hand, and
-  you see what Hermes changed (it glides into place with a note).
+  you see what Hermes changed (it glides into place with a note), and when
+  Hermes creates or opens another room the editor follows.
 - **Real products at true size.** Give Hermes a link; it reads the page with its
   own web tools and the plugin parses the dimensions (cm, mm, m, inches, feet)
   into a stand-in box with the product name, price and link.
