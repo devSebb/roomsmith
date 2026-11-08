@@ -39,3 +39,7 @@ Built 2026-11-07, hackathon week.
 - Editor: no right-button binding (Hermes Desktop owns right-click for its own
   menu); pan is ⇧-drag or middle-drag, shown in the hint. 60-object room measured
   at 60 fps in Desktop during orbit and drag.
+- `web/dev/desktop-attach.mjs` + `web/dev/desktop-smoke.mjs`: the Desktop checklist
+  as a script (sidebar entry, pane + WebGL, ctx.rest, status chip, full page, New
+  room, editor follows an agent-created room, undo). `scripts/pin-catalog.py`
+  fills the catalog entry from a green, pushed commit.
