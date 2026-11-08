@@ -172,10 +172,13 @@ def build_scene(project_id: str, name: str, draft: dict | None, notes: list[str]
             obj["yaw_rad"] = wyaw if yaw is None else yaw
         elif yaw is None:
             obj["yaw_rad"] = math.pi  # free-standing default: face the camera
-        if spec.mount == "surface":
+        if spec.mount == "surface" or _looks_tabletop(category, dims):
             host = _host_under(placed, obj)
-            if host is not None:
+            if host is not None and (spec.mount == "surface" or host.get("category") in SURFACE_HOSTS):
                 obj["position_m"][1] = m.object_top(host)
+                obj["mount"] = "surface"
+                if spec.mount != "surface":
+                    notes.append(f"{label}: placed on top of {host['name']}.")
         _keep_inside(scene, obj)
         placed.append(obj)
         scene["objects"].append(obj)
@@ -205,12 +208,32 @@ def _free_offset(offset: float, w: float, L: float, spans: list[tuple[float, flo
     return None
 
 
+# Floor categories that carry things: a small plant/lamp/box whose centre lands on one sits on it.
+SURFACE_HOSTS = frozenset({"table_side", "table_coffee", "table_dining", "table", "desk", "nightstand", "dresser", "sideboard", "cabinet", "tv_stand", "counter", "shelf", "bookshelf", "ottoman"})
+TABLETOP_MAX_HEIGHT_M = 0.6
+TABLETOP_MAX_FOOTPRINT_M = 0.6
+
+
+def _looks_tabletop(category: str, dims: tuple[float, float, float]) -> bool:
+    """A small floor-category object (plant, box, 'other') that is more likely sitting on furniture."""
+    return category in ("plant", "box", "other", "lamp_floor") and dims[1] <= TABLETOP_MAX_HEIGHT_M and max(dims[0], dims[2]) <= TABLETOP_MAX_FOOTPRINT_M
+
+
 def _host_under(placed: list[dict], obj: dict) -> dict | None:
+    """The floor object this one sits on: its centre is inside the host's footprint,
+    or (estimated positions being what they are — the host may have been snapped
+    to a wall after the model placed both at the same spot) its footprint touches
+    the host's. The object is then pulled onto the host."""
     cx, _cy, cz = obj["position_m"]
+    half = min(float(obj["dimensions_m"][0]), float(obj["dimensions_m"][2])) / 2.0
     for p in reversed(placed):
-        if p.get("mount") != "floor":
+        if p.get("mount", "floor") != "floor" or p is obj:
             continue
-        if g.point_in_polygon((cx, cz), m.footprint(p)):
+        fp = m.footprint(p)
+        if g.point_in_polygon((cx, cz), fp) or g.convex_overlap_depth(m.footprint(obj), fp) > 0.01:
+            bx0, bz0, bx1, bz1 = g.bounds(fp)
+            obj["position_m"][0] = min(max(cx, bx0 + half), bx1 - half) if bx1 - bx0 > 2 * half else (bx0 + bx1) / 2
+            obj["position_m"][2] = min(max(cz, bz0 + half), bz1 - half) if bz1 - bz0 > 2 * half else (bz0 + bz1) / 2
             return p
     return None
 

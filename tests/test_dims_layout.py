@@ -102,3 +102,24 @@ def test_build_scene_from_garbage():
     validate.validate_hard(scene)
     assert scene["objects"] == []
     assert any("default" in n for n in notes)
+
+
+def test_small_plant_on_a_side_table_sits_on_it():
+    """From the first real photo: a potted plant whose centre lands on a side
+    table is a tabletop plant, not a floor plant overlapping the table."""
+    draft = {
+        "room": {"width_m": 3.1, "depth_m": 5.6, "height_m": 2.7},
+        "objects": [
+            {"label": "Side table", "category": "table_side", "width_m": 0.4, "height_m": 0.55, "depth_m": 0.4, "against_wall": "right", "across_fraction": 0.85, "into_fraction": 0.04},
+            {"label": "Potted plant", "category": "plant", "width_m": 0.25, "height_m": 0.3, "depth_m": 0.25, "against_wall": "none", "across_fraction": 0.85, "into_fraction": 0.04},
+            {"label": "Tall plant", "category": "plant", "width_m": 0.5, "height_m": 1.5, "depth_m": 0.5, "against_wall": "none", "across_fraction": 0.2, "into_fraction": 0.5},
+        ],
+    }
+    scene, notes = layout.build_scene("p", "Photo", draft)
+    validate.validate_hard(scene)
+    table, plant, tall = scene["objects"]
+    assert plant["mount"] == "surface"
+    assert abs(plant["position_m"][1] - 0.55) < 1e-6
+    assert any("placed on top of Side table" in n for n in notes)
+    assert tall["mount"] == "floor" and tall["position_m"][1] == 0.0
+    assert not [i for i in validate.issues(scene) if i["code"] == "overlap"]
