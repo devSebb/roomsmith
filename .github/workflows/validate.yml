@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.11", "3.13"]
+        python: ["3.11", "3.14"]  # 0.21 runs on 3.11; 0.23 runs on 3.14
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -77,14 +77,12 @@ jobs:
           repository: NousResearch/hermes-agent
           ref: ${{ matrix.hermes_ref }}
           path: hermes-agent
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
       - uses: astral-sh/setup-uv@v5
-      - name: install hermes-agent
+      - name: install hermes-agent (uv sync, Python 3.14 — the only runtime its lock covers)
+        working-directory: hermes-agent
         run: |
-          uv venv .venv
-          uv pip install --python .venv/bin/python -e ./hermes-agent
+          uv python install 3.14
+          uv sync --locked --no-dev --python 3.14
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - name: hermes version
         run: hermes --version || hermes version
