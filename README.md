@@ -38,17 +38,26 @@ before you buy.
 ## Install
 
 ```bash
-hermes plugins install devSebb/roomsmith      # from the catalog / GitHub
-hermes plugins enable roomsmith               # the agent half
+hermes plugins install devSebb/roomsmith      # GitHub shorthand or the catalog name
+hermes plugins enable roomsmith               # if it installed disabled
+hermes plugins doctor roomsmith --ci          # optional: 9 tools, 1 hook, OK
 ```
 
-- **Desktop:** Hermes Desktop lists the plugin under **Settings → Plugins**;
-  switch it on to get the Roomsmith pane, page and palette command.
-- **Dashboard:** `hermes dashboard` shows a **Roomsmith** tab once the plugin
-  is enabled.
+Then, depending on where you talk to Hermes:
 
-Requires Hermes Agent ≥ 0.21.0. No API keys, no accounts, no network access of
-its own (see *Privacy* below).
+- **Hermes Desktop:** *Settings → Plugins* lists two entries, **Roomsmith · on disk**
+  (the editor) and **roomsmith** (the agent plugin). Switch the editor on: a
+  **Roomsmith** entry appears in the sidebar, the room pane opens beside the chat,
+  and a 🛋 chip in the status bar shows the active room. The full-page editor
+  (sidebar entry / `⌘K` → *Open Roomsmith*) appears after the next app restart —
+  Desktop registers pages at start-up.
+- **CLI / `hermes dashboard`:** the tools work in any chat (`-t roomsmith` if you
+  pin toolsets); the dashboard shows a **Roomsmith** tab with the same editor.
+
+Requires Hermes Agent ≥ 0.21.0 (verified on 0.21.0 and 0.23.0). No API keys, no
+accounts, no network access of its own (see *Privacy* below). Photo reading uses
+whichever model your Hermes already runs; if that model cannot see images, the
+plugin says so and builds the room from the sizes you give it instead.
 
 ## Try it
 
@@ -125,10 +134,18 @@ the room facing that wall.
 ## Known limitations (0.1)
 
 - Photos give a *draft*: one photo shows two or three walls; the fourth wall and
-  anything behind the camera are guesses. Calibrate before trusting sizes.
-- HEIC photos are not read yet; export as JPEG first.
+  anything behind the camera are guesses. Calibrate (one real measurement) before
+  trusting sizes — the editor shows a **Draft** badge until you do.
+- Photo reading needs a model that accepts images. Otherwise the tool reports
+  which fallback it took and asks for the room's measurements.
+- HEIC photos are not read yet; export as JPEG/PNG first.
 - Rooms are polygons in the data model but the editor resizes rectangles only.
-- Furniture is boxes and cylinders, not 3D product models.
+- Furniture is boxes and cylinders, not 3D product models; product pages are
+  read by Hermes's own web tools, so a page without printed dimensions needs you
+  to type them.
+- Hermes Desktop: the full-page editor needs one app restart after enabling; the
+  Desktop's own right-click menu owns right-click on the canvas (pan with ⇧-drag
+  or the middle button).
 
 ## Licence
 

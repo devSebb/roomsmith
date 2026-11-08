@@ -25,3 +25,4 @@ fixtures/photos/
 
 # dev-only build output (4 MB with React inlined); rebuilt by `npm run dev`
 web/dev/dev.js
+dist/
