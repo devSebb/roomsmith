@@ -668,6 +668,8 @@ Never cut: the engine and its tests, the tools, move/rotate/resize with undo in 
 
 ### 18a. Demo script (under 90 seconds)
 
+Concrete, filmable version with exact prompts, fallbacks and a dry-run checklist: `docs/demo-script.md` (9 Nov). Demo setup: Hermes Desktop on the MacBook connected over SSH to the Mini test home.
+
 | Time | On screen | Shows |
 |---|---|---|
 | 0–8 s | A room photo dropped into Hermes Desktop: "Build this room." | The hook |
