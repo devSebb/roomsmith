@@ -108,7 +108,13 @@ def _guess_unit(values: list[float]) -> str:
     return "m"
 
 
-def parse_dimensions(text: str | None, default_unit: str | None = None) -> dict[str, Any] | None:
+# Categories whose "length" is the long side you lie or walk along, i.e. our depth
+# (front-to-back), not the width across the front. Everything else ("L x W x H" for
+# sofas, tables, sideboards) keeps L as the width across the front.
+LENGTH_IS_DEPTH = frozenset({"bed", "bed_single", "bed_double", "bed_queen", "bed_king", "crib", "bathtub", "rug", "bench", "mattress"})
+
+
+def parse_dimensions(text: str | None, default_unit: str | None = None, category: str | None = None) -> dict[str, Any] | None:
     """Return parsed dimensions or None when nothing usable is found."""
     if not text or not isinstance(text, str):
         return None
@@ -152,8 +158,10 @@ def parse_dimensions(text: str | None, default_unit: str | None = None) -> dict[
         # "L x W x H" listings (sofas, tables, rugs): L is the long side across the
         # front, W is front-to-back. With only W, D, H: the usual meaning.
         if "length" in labelled and "width" in labelled and "depth" not in labelled:
-            width = labelled["length"]
-            depth = labelled["width"]
+            if (category or "") in LENGTH_IS_DEPTH:
+                width, depth = labelled["width"], labelled["length"]  # bed: W is the headboard side, L the length
+            else:
+                width, depth = labelled["length"], labelled["width"]  # sofa/table: L runs across the front
         else:
             width = labelled.get("width", labelled.get("length"))
             depth = labelled.get("depth")

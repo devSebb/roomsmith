@@ -183,3 +183,31 @@ def test_nudge_apart_lets_the_larger_object_give_way_and_carries_riders():
     assert not [i for i in validate.issues(s) if i["code"] == "overlap"], validate.issues(s)
     assert abs(plant["position_m"][2] - table["position_m"][2]) < 1e-6  # rode with the table, not the sofa
     assert plant["position_m"][1] == 0.58
+
+
+def test_real_product_pages_parse_with_the_right_axes():
+    """Strings copied from live product pages (Floyd, 2026-11-09). A bed's L is its
+    length (our depth); a sofa's L would be its width across the front."""
+    from rs_core import dims
+
+    sofa = dims.parse_dimensions('Overall: 86"W x 34"D x 32"H', category="sofa")
+    assert (round(sofa["width_m"], 3), round(sofa["depth_m"], 3), round(sofa["height_m"], 3)) == (2.184, 0.864, 0.813)
+    bed = dims.parse_dimensions('Overall: 67” W x 86" L x 7.5” H', category="bed_double")
+    assert (round(bed["width_m"], 2), round(bed["depth_m"], 2), round(bed["height_m"], 2)) == (1.70, 2.18, 0.19)
+    king = dims.parse_dimensions('Overall 89” W x 86" L x 31.5” H', category="bed_double")
+    assert round(king["width_m"], 2) == 2.26 and round(king["depth_m"], 2) == 2.18
+    table = dims.parse_dimensions("L 160 x W 90 x H 75 cm", category="table_dining")
+    assert (table["width_m"], table["depth_m"]) == (1.6, 0.9)  # unchanged convention for tables/sofas
+    block = dims.parse_dimensions('Overall: 15" W x 12.56" L x 22" H', category="shelf")
+    assert round(block["width_m"], 3) == 0.319 and round(block["depth_m"], 3) == 0.381  # shelf: L runs along the front
+
+
+def test_add_product_uses_the_title_to_pick_the_axis_rule(tmp_path):
+    from rs_core.service import RoomService
+
+    s = RoomService(tmp_path / "data.db", tmp_path)
+    pid = s.create_project("B", width_m=2.82, depth_m=4.0)["project_id"]
+    r = s.add_product(pid, title="The Floyd Bed - Original (Queen)", dimensions_text='Overall: 67” W x 86" L x 7.5” H', url="https://floydhome.com/products/the-bed-frame", place={"against_wall": "right", "align": "left"})
+    assert r["ok"], r
+    assert r["object"]["category"].startswith("bed")
+    assert round(r["object"]["dimensions_m"][0], 2) == 1.70 and round(r["object"]["dimensions_m"][2], 2) == 2.18

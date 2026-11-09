@@ -48,6 +48,10 @@ Built 2026-11-07, hackathon week.
   `next_step` tells the agent to review draft issues with the user, not fix them
   blindly. S1 chat smoke passed on the Mini; `--image` is rejected by the gateway
   CLI (S6 blocked there; path route works).
+- Dimension parser: when a page gives W and L (Floyd beds: `67" W x 86" L`), L is
+  the depth for beds, cribs, rugs, benches, bathtubs and mattresses, and the width
+  across the front for everything else (sofas, tables). `add_product` passes the
+  category inferred from the title. Tested with strings copied from live pages.
 - 2026-11-09: second live run on the Mini (bedroom, three photos, 562920b) passed
   every beat: one `roomsmith_from_photo` call with all three images, the agent
   chose `room_size` calibration from "the room is 2.82 by 4 metres", answered a

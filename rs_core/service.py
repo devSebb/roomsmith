@@ -17,6 +17,7 @@ from typing import Any
 from rs_core import dims as dims_mod
 from rs_core import export_glb, fitcheck, layout, ops, summarize, validate
 from rs_core import model as m
+from rs_core.catalog import normalize_category
 from rs_core.model import SceneError
 from rs_core.store import NotFound, RevisionConflict, Store
 
@@ -369,7 +370,7 @@ class RoomService:
             return _err("missing_field", "title is required")
         parsed = None
         if dimensions_m is None and dimensions_text:
-            parsed = dims_mod.parse_dimensions(dimensions_text)
+            parsed = dims_mod.parse_dimensions(dimensions_text, category=normalize_category(category or title))
             if parsed is None:
                 return _err("dimensions_unreadable", f"Could not read dimensions from {dimensions_text!r}. Ask the user for width x height x depth.", dimensions_text=dimensions_text)
             if parsed.get("partial"):
