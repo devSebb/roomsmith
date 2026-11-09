@@ -186,6 +186,8 @@ class RoomService:
         issues = validate.issues(scene)
         out = {"ok": True, "project_id": pid, "revision": rev, "name": scene["project"]["name"]}
         if detail == "full":
+            # the compact fields too (text, room, objects, calibration): a full inspect must never say less than a summary
+            out.update(summarize.compact(scene, issues, rev))
             out["scene"] = scene
             out["issues"] = issues
             out["summary"] = summarize.summary_text(scene, issues, rev)

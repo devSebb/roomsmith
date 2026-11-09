@@ -188,3 +188,14 @@ def test_rename_delete_activate(svc):
     d = svc.delete(p2)
     assert d["ok"] and d["active_project_id"] == p1
     assert not svc.inspect(p2)["ok"]
+
+
+def test_full_inspect_reports_everything_the_summary_does(tmp_path):
+    """Seen on the Mini: detail='full' returned calibration: null while the summary said 'calibrated'."""
+    s = RoomService(tmp_path / "data.db", tmp_path)
+    pid = s.create_project("R", width_m=3, depth_m=4)["project_id"]
+    full, summary = s.inspect(pid, detail="full"), s.inspect(pid, detail="summary")
+    for k in ("text", "room", "objects", "calibration", "issues"):
+        assert k in full, k
+    assert full["calibration"]["status"] == summary["calibration"]["status"] == "calibrated"
+    assert "scene" in full and "scene" not in summary

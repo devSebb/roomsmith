@@ -48,6 +48,14 @@ Built 2026-11-07, hackathon week.
   `next_step` tells the agent to review draft issues with the user, not fix them
   blindly. S1 chat smoke passed on the Mini; `--image` is rejected by the gateway
   CLI (S6 blocked there; path route works).
+- 2026-11-09: second live run on the Mini (bedroom, three photos, 562920b) passed
+  every beat: one `roomsmith_from_photo` call with all three images, the agent
+  chose `room_size` calibration from "the room is 2.82 by 4 metres", answered a
+  wardrobe fit question with `fits_at` numbers (and a sensible 20 cm caveat),
+  `/room`, full inspect. Scorecard in `docs/compat.md` (S3); scoring script
+  `scripts/score-draft.py`. Fixed: `roomsmith_inspect detail=full` now includes
+  the summary fields (calibration was null). Photo instructions: depth from
+  side-wall furniture, no bias either way.
 - Calibration rethought after the first ground truth (Sebb's room is 2.85 × 3.0 m;
   the photo read said 2.65 × 4.4 — width 7 % off, depth 47 % over, the wide-angle
   stretch): new `calibrate {kind: 'room_size', width_m, depth_m}` fits each axis

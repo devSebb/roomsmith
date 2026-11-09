@@ -622,7 +622,7 @@ Each milestone has a goal, deliverables, and exit criteria that are yes-or-no. T
 
 **Exit:** in Chrome (dashboard) and in Hermes Desktop: the room renders in both views; select, move with snapping, rotate, resize, delete, undo and redo work; an edit made by Hermes in chat animates in the editor within two seconds; an edit made by hand is visible to `roomsmith_inspect` at once.
 
-### M4 — Photo to draft, and calibration (Monday morning) — **done 8 Nov**: S2 passed on the Mini (gpt-6-astra read the real photo through `ctx.llm`, no fallback); builder fixes from that run (ceiling/wall mounts, height-aware checks). Scorecard needs one real measurement from Sebb and more photos
+### M4 — Photo to draft, and calibration (Monday morning) — **done 8 Nov**: S2 passed on the Mini (gpt-6-astra read the real photo through `ctx.llm`, no fallback); builder fixes from that run (ceiling/wall mounts, height-aware checks). Scorecard 9 Nov on two measured rooms (one photo / three photos): widths within 1–7 %, depth ±22–47 %, every object and opening on the right wall; `room_size` calibration closes the gap. Exit met
 
 **Goal:** the opening moment of the demo works on real photos.
 
