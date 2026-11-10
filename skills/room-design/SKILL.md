@@ -21,6 +21,14 @@ numbered revision with undo.
 3. **Read the result.** The reply lists what changed and any issues the
    change caused (`overlap`, `outside_room`, `blocks_door`, `blocks_window`,
    `tight_walkway`, `too_tall`). Fix them or tell the user, in one sentence.
+   A described placement (`against_wall`, `next_to`, `in_corner`,
+   `centered_in_room`) that would land inside another floor piece is slid to
+   the nearest clear spot automatically — the receipt says by how much
+   ("slid 0.62 m along the wall to clear the bed"); repeat that to the user.
+   Only things that sit *on* furniture (`mount: surface`, e.g. a lamp on a
+   desk) may share a footprint; they move with their host. Never leave two
+   floor pieces overlapping; if the receipt says "no clear spot nearby",
+   offer to move or remove something.
 4. **Quote numbers from tools**, with units. Do not estimate clearances or
    whether something fits — ask `roomsmith_check`.
 

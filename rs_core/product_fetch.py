@@ -33,8 +33,12 @@ USER_AGENT = "Roomsmith/0.1 (+https://github.com/devSebb/roomsmith; reads only p
 MAX_BYTES = 8 * 1024 * 1024
 TIMEOUT_S = 12
 
-_DIM_LINE = re.compile(r"\d+(?:[.,]\d+)?\s*(?:cm|mm|m|in|inch|inches|\"|”|′|'|ft)?\s*(?:x|×|\*|by)\s*[WDHL]?\s*:?\s*\d", re.I)
+_DIM_LINE = re.compile(r"\d+(?:[.,]\d+)?\s*(?:cm|mm|m|in|inch|inches|\"|”|′|'|ft)?\s*[WDHL]?\s*(?:x|×|\*|by)\s*[WDHL]?\s*:?\s*\d", re.I)
 _PRIORITY = re.compile(r"overall|dimension|measure|size", re.I)
+# the box it ships in, not the thing: "Package: 29 x 25 x 15 | 44 lbs", "(1 of 2) - 83” x 13” x 5”"
+_DEMOTE = re.compile(r"packag|box|carton|shipping|ships|parcel|\(\d+ of \d+\)|\blbs?\b|\bkg\b|weight", re.I)
+_SIZE_WORDS = {"bed_single": "twin|single", "bed_double": "full|double", "bed_queen": "queen", "bed_king": "king"}
+MAX_SCRIPT_BYTES = 3 * 1024 * 1024
 
 
 class FetchError(Exception):
@@ -93,13 +97,16 @@ class _Page(HTMLParser):
         self.meta: dict[str, str] = {}
         self.title = ""
         self.text: list[str] = []
+        self.scripts: list[str] = []  # inline JS/JSON: modern stores keep the spec sheet here
+        self._script_bytes = 0
         self._in: str | None = None
         self._skip = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         a = {k.lower(): (v or "") for k, v in attrs}
         if tag == "script":
-            self._in = "jsonld" if a.get("type", "").lower().strip() == "application/ld+json" else "skip"
+            kind = a.get("type", "").lower().strip()
+            self._in = "jsonld" if kind == "application/ld+json" else ("script" if a.get("src") is None else "skip")
         elif tag in ("style", "noscript", "svg"):
             self._in = "skip"
         elif tag == "title":
@@ -120,6 +127,10 @@ class _Page(HTMLParser):
     def handle_data(self, data: str) -> None:
         if self._in == "jsonld":
             self.jsonld.append(data)
+        elif self._in == "script":
+            if self._script_bytes < MAX_SCRIPT_BYTES:
+                self.scripts.append(data)
+                self._script_bytes += len(data)
         elif self._in == "title":
             self.title += data
         elif self._in is None:
@@ -130,6 +141,29 @@ def _strip_tags(s: str) -> str:
     s = re.sub(r"<br\s*/?>|</p>|</li>|</div>|</tr>|</h\d>", "\n", s, flags=re.I)
     s = re.sub(r"<[^>]+>", " ", s)
     return html.unescape(s)
+
+
+_ESCAPES = (("\\u003c", "<"), ("\\u003e", ">"), ("\\u0026", "&"), ("\\u201d", "”"), ("\\u201c", "“"), ("\\/", "/"), ('\\"', '"'), ("\\n", "\n"), ("\\r", ""), ("\\t", " "))
+
+
+def _script_lines(scripts: list[str]) -> str:
+    """Dimension-looking lines buried in inline scripts (Shopify section JSON, Next.js
+    payloads). Escapes are undone twice because framework payloads are often JSON
+    inside JSON; then tags are stripped and string literals become lines."""
+    out: list[str] = []
+    for body in scripts:
+        if not re.search(r"\d\s*(?:\\?\"|”|\\u201d|&quot;|cm|mm|in(?:ch(?:es)?)?\b)", body, re.I):
+            continue
+        t = body
+        for _ in range(2):
+            for a, b in _ESCAPES:
+                t = t.replace(a, b)
+        t = _strip_tags(t)
+        for chunk in re.split(r'["\n]', t):
+            line = re.sub(r"\s+", " ", chunk).strip()
+            if 6 <= len(line) <= 200 and (_DIM_LINE.search(line) or _PRIORITY.search(line)) and re.search(r"\d", line):
+                out.append(line)
+    return "\n".join(out)
 
 
 def _lines(text: str) -> list[str]:
@@ -276,19 +310,28 @@ def _from_meta(page: _Page) -> dict:
 
 def find_dimensions(texts: list[str], category: str | None = None) -> dict | None:
     """First fully parseable dimension line, preferring lines that announce themselves."""
-    candidates: list[tuple[int, str]] = []
-    for text in texts:
+    candidates: list[tuple[int, int, str]] = []
+    size_word = re.compile(r"\b(?:%s)\b" % _SIZE_WORDS[category], re.I) if category in _SIZE_WORDS else None
+    for ti, text in enumerate(texts):
         for line in _lines(text):
             if not _DIM_LINE.search(line) and not re.search(r"\b(width|depth|height|length|dimensions?)\b", line, re.I):
                 continue
             score = 0 if _PRIORITY.search(line) else 1
-            candidates.append((score, line))
-    candidates.sort(key=lambda t: t[0])
-    for _, line in candidates:
+            if _DEMOTE.search(line):
+                score += 2
+            if size_word and size_word.search(line):  # "Queen: 68” W x 93” D" when the user asked about a queen bed
+                score -= 2
+            candidates.append((score, ti, line))
+    candidates.sort(key=lambda t: (t[0], t[1]))
+    partial_fallback: dict | None = None
+    for _, _, line in candidates:
         parsed = dims_mod.parse_dimensions(line, category=category)
         if parsed and not parsed.get("partial"):
             parsed["dimensions_text"] = line[:200]
             return parsed
+        if parsed and partial_fallback is None and parsed.get("missing") == ["height_m"] and category:
+            partial_fallback = parsed
+            partial_fallback["dimensions_text"] = line[:200]
     # labelled values scattered over several lines ("Width 180 cm" / "Depth 90 cm" / "Height 75 cm")
     for text in texts:
         joined = ", ".join(l for l in _lines(text) if re.search(r"\b(width|depth|height|length|w|d|h)\b", l, re.I) and re.search(r"\d", l))
@@ -296,6 +339,15 @@ def find_dimensions(texts: list[str], category: str | None = None) -> dict | Non
         if parsed and not parsed.get("partial"):
             parsed["dimensions_text"] = joined[:200]
             return parsed
+    if partial_fallback is not None:
+        # footprint printed, height not (desks sold by top size): take the category's usual height
+        from rs_core.catalog import spec_for
+
+        spec = spec_for(category)
+        partial_fallback["height_m"] = round(float(spec.default[1]), 4)
+        partial_fallback["height_assumed"] = True
+        partial_fallback.pop("partial", None)
+        return partial_fallback
     return None
 
 
@@ -331,7 +383,7 @@ def fetch_product(url: str, category: str | None = None, _get=_get) -> dict:
                 return {"ok": False, "url": url, "error": {"code": e.code, "message": e.message}}
             notes.append(f"No Shopify product JSON ({e.code}); reading the page itself.")
     page = _Page()
-    if found is None or not any(t.strip() for t in found.get("texts", [])):
+    if found is None or not find_dimensions([t for t in found.get("texts", []) if t], category=category):
         try:
             body, ctype, final_url = _get(url)
         except FetchError as e:
@@ -351,7 +403,7 @@ def fetch_product(url: str, category: str | None = None, _get=_get) -> dict:
     else:
         for k in ("title", "image_url", "price"):
             found[k] = found.get(k) or meta.get(k)
-    texts = list(found.get("texts") or []) + [meta["texts"][0], "\n".join(page.text)]
+    texts = list(found.get("texts") or []) + [meta["texts"][0], "\n".join(page.text), _script_lines(page.scripts)]
     parsed = find_dimensions([t for t in texts if t], category=category)
 
     out: dict[str, Any] = {
@@ -367,6 +419,8 @@ def fetch_product(url: str, category: str | None = None, _get=_get) -> dict:
         out["dimensions_text"] = parsed.pop("dimensions_text")
         out["dimensions_m"] = [parsed["width_m"], parsed["height_m"], parsed["depth_m"]]
         out["dims"] = parsed
+        if parsed.get("height_assumed"):
+            out["notes"].append(f"The page prints only the footprint; height {parsed['height_m']:.2f} m is the usual {category} height.")
     else:
         out["dims"] = None
         out["dimensions_m"] = None

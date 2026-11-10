@@ -102,3 +102,21 @@ Built 2026-11-07, hackathon week.
   as a script (sidebar entry, pane + WebGL, ctx.rest, status chip, full page, New
   room, editor follows an agent-created room, undo). `scripts/pin-catalog.py`
   fills the catalog entry from a green, pushed commit.
+- 2026-11-10: **no more desks inside beds.** A described placement or move
+  (`against_wall`, `next_to`, `in_corner`, `centered_in_room`) that would land a
+  floor piece inside another slides it to the nearest clear spot — along the same
+  wall first — and the receipt says so ("slid 0.62 m along the wall to clear the
+  bed"); exact `position_m` (editor drags) and `allow_overlap: true` are honoured
+  as given; when nothing nearby is free the receipt says that instead of hiding
+  it. Things sitting on furniture (`mount: surface`) now move, rotate and fall to
+  the floor with their host. Seen in the Desktop dry run: Hermes put a 1.2 m desk
+  "where the bed was", 60 cm inside the bed, and reported it rather than fixing it.
+- 2026-11-10: product pages: dimensions buried in inline scripts (Shopify section
+  JSON, Next.js payloads) are read; shipping-box lines ("Package: 29 x 25 x 15 |
+  44 lbs", "(1 of 2) - 83” x 13” x 5”") lose to the product's own; the size
+  variant the user asked about wins ("Queen: 68” W x 93” D" for `bed_queen`);
+  a page that prints only the footprint (desk tops: "48 inches x 27 inches") gets
+  the category's usual height, with a note; a Shopify JSON without sizes falls
+  through to the page. Read correctly live from the MacBook: Castlery (Hamilton
+  sofa, Casa dining table), Sixpenny (Neva sofa, Neva chair), Albany Park (Kova
+  sofas), Thuma (Classic Bed, queen), Branch (Tria desk, Ergonomic chair).

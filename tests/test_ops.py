@@ -273,3 +273,74 @@ def test_facing_and_on_surface():
     desk, lamp = r.scene["objects"]
     assert abs(lamp["position_m"][1] - 0.75) < 1e-9
     assert abs(desk["yaw_rad"] - math.pi) < 1e-9
+
+
+def test_described_placement_slides_clear_of_floor_pieces():
+    """'Put a desk where the bed was' must never leave the desk inside the bed: a
+    described placement slides along the wall to the nearest clear spot and says so."""
+    s = scene()
+    r = apply(
+        s,
+        {"op": "add_object", "name": "Bed", "category": "bed_double", "dimensions_m": [1.6, 0.5, 2.0], "place": {"against_wall": "w1", "align": "center"}},
+        {"op": "add_object", "name": "Desk", "category": "desk", "dimensions_m": [1.2, 0.75, 0.6], "place": {"against_wall": "w1", "align": "center"}},
+    )
+    bed, desk = r.scene["objects"]
+    assert g.convex_overlap_depth(m.footprint(bed), m.footprint(desk)) <= 0.01
+    assert abs(desk["position_m"][2] - 0.32) < 1e-6  # still against the back wall
+    res = r.results[1]
+    assert "slid" in res.summary and "Bed" in res.summary
+    assert res.details["adjusted_m"] > 1.0 and res.details["cleared"] == ["Bed"]
+    assert res.details["position_m"] == desk["position_m"]
+    # same for a described move
+    r2 = apply(r.scene, {"op": "move_object", "id": desk["id"], "place": {"against_wall": "w1", "align": "center"}})
+    d2 = m.find_object(r2.scene, desk["id"])
+    assert g.convex_overlap_depth(m.footprint(bed), m.footprint(d2)) <= 0.01 and "slid" in r2.results[0].summary
+
+
+def test_exact_positions_and_allow_overlap_are_left_alone():
+    s = scene()
+    r = apply(
+        s,
+        {"op": "add_object", "name": "Bed", "category": "bed_double", "dimensions_m": [1.6, 0.5, 2.0], "place": {"against_wall": "w1", "align": "center"}},
+        {"op": "add_object", "name": "Rug", "category": "rug", "dimensions_m": [2.0, 0.01, 3.0], "place": {"against_wall": "w1", "align": "center"}},
+        {"op": "add_object", "name": "Box", "category": "box", "dimensions_m": [0.4, 0.4, 0.4], "position_m": [2.0, 0.0, 1.0]},
+        {"op": "add_object", "name": "Box2", "category": "box", "dimensions_m": [0.4, 0.4, 0.4], "place": {"against_wall": "w1", "align": "center"}, "allow_overlap": True},
+    )
+    rug, box, box2 = r.scene["objects"][1:]
+    assert "slid" not in r.results[1].summary  # rugs may lie under anything
+    assert box["position_m"][0] == 2.0 and box["position_m"][2] == 1.0 and "slid" not in r.results[2].summary  # editor drag
+    assert "slid" not in r.results[3].summary
+
+
+def test_no_clear_spot_is_reported_not_hidden():
+    s = m.new_scene("p1", "Tiny", 2.0, 2.0, 2.5)
+    r = apply(
+        s,
+        {"op": "add_object", "name": "Bed", "category": "bed_double", "dimensions_m": [1.9, 0.5, 1.9], "place": {"centered_in_room": True}},
+        {"op": "add_object", "name": "Desk", "category": "desk", "dimensions_m": [1.2, 0.75, 0.6], "place": {"against_wall": "w1", "align": "center"}},
+    )
+    res = r.results[1]
+    assert "no clear spot" in res.summary and res.details["overlaps"] == ["Bed"]
+    assert "slid" not in res.summary
+
+
+def test_riders_follow_their_host():
+    s = scene()
+    r = apply(
+        s,
+        {"op": "add_object", "name": "Nightstand", "category": "nightstand", "dimensions_m": [0.5, 0.6, 0.4], "place": {"against_wall": "w1", "align": "left"}},
+        {"op": "add_object", "name": "Book", "category": "other", "dimensions_m": [0.2, 0.03, 0.14], "place": {"on": "ob1", "position_m": [0.35, 0.6, 0.3]}},
+    )
+    book = m.find_object(r.scene, "ob2")
+    assert book["mount"] == "surface" or abs(book["position_m"][1] - 0.6) < 1e-6
+    book["mount"] = "surface"  # the photo pipeline marks riders; the `on` placement only sets height
+    r2 = apply(r.scene, {"op": "move_object", "id": "ob1", "place": {"against_wall": "w1", "align": "right"}})
+    ns, bk = r2.scene["objects"]
+    assert g.point_in_polygon((bk["position_m"][0], bk["position_m"][2]), m.footprint(ns))
+    assert "with Book on it" in r2.results[0].summary and "ob2" in r2.results[0].changed_ids
+    r3 = apply(r2.scene, {"op": "rotate_object", "id": "ob1", "by_deg": 90})
+    ns, bk = r3.scene["objects"]
+    assert g.point_in_polygon((bk["position_m"][0], bk["position_m"][2]), m.footprint(ns))
+    r4 = apply(r3.scene, {"op": "remove_object", "id": "ob1"})
+    (bk,) = r4.scene["objects"]
+    assert bk["mount"] == "floor" and bk["position_m"][1] == 0.0 and "now on the floor" in r4.results[0].summary

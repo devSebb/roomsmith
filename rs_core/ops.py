@@ -348,13 +348,63 @@ def op_add_object(scene: dict, op: dict) -> OpResult:
     else:
         obj["position_m"], obj["yaw_rad"], desc = _auto_place(scene, obj)
     scene["objects"].append(obj)
+    details = {"position_m": list(obj["position_m"]), "yaw_rad": obj["yaw_rad"]}
+    desc += _clear(scene, obj, op, place, details)
     return OpResult(
         "add_object",
         f"Added {obj['name']} ({obj['id']}), {_dims_str(obj['dimensions_m'])}, {desc}",
         [obj["id"]],
         created_id=obj["id"],
-        details={"position_m": list(obj["position_m"]), "yaw_rad": obj["yaw_rad"]},
+        details=details,
     )
+
+
+SEMANTIC_PLACE = ("against_wall", "next_to", "in_corner", "centered_in_room")
+
+
+def _clear(scene: dict, obj: dict, op: dict, place: dict, details: dict) -> str:
+    """After a described placement (against a wall, next to…), slide the piece to the
+    nearest clear floor spot and say so. Exact coordinates (editor drags, `position_m`,
+    `by`), surface/wall/ceiling mounts and `allow_overlap: true` are left alone."""
+    from rs_core.layout import clear_overlap
+
+    if op.get("allow_overlap") or not any(k in place for k in SEMANTIC_PLACE) or "position_m" in place or "by" in place:
+        return ""
+    if obj.get("mount", "floor") != "floor":
+        return ""
+    r = clear_overlap(scene, obj)
+    if r is None:
+        return ""
+    details["position_m"] = list(obj["position_m"])
+    who = " and ".join(r["cleared"])
+    if r.get("failed"):
+        details["overlaps"] = r["cleared"]
+        return f"; no clear spot nearby, it overlaps {who} (move or remove something, or pass allow_overlap)"
+    details["adjusted_m"] = r["moved_m"]
+    details["cleared"] = r["cleared"]
+    return f"; slid {r['moved_m']:.2f} m {r['direction']} to clear {who}"
+
+
+def _riders(scene: dict, host: dict) -> list[dict]:
+    """Things sitting on `host`: surface-mounted, resting at its top, centred over it."""
+    top = m.object_top(host)
+    fp = m.footprint(host)
+    return [
+        o for o in scene["objects"]
+        if o is not host and o.get("mount") == "surface" and abs(float(o["position_m"][1]) - top) < 0.02
+        and g.point_in_polygon((float(o["position_m"][0]), float(o["position_m"][2])), fp)
+    ]
+
+
+def _carry(riders: list[dict], host: dict, before_pos: list[float], before_yaw: float) -> None:
+    """Move what sat on `host` with it (translation plus rotation about the host centre)."""
+    dyaw = float(host.get("yaw_rad", 0.0)) - before_yaw
+    for rd in riders:
+        local = (float(rd["position_m"][0]) - before_pos[0], float(rd["position_m"][2]) - before_pos[2])
+        rx, rz = g.rotate(local, dyaw)
+        rd["position_m"][0] = float(host["position_m"][0]) + rx
+        rd["position_m"][2] = float(host["position_m"][2]) + rz
+        rd["yaw_rad"] = g.normalize_yaw(float(rd.get("yaw_rad", 0.0)) + dyaw)
 
 
 def _auto_place(scene: dict, obj: dict) -> tuple[list[float], float, str]:
@@ -458,15 +508,18 @@ def op_move_object(scene: dict, op: dict) -> OpResult:
             place[k] = op[k]
     if not place:
         raise SceneError("missing_field", "move_object needs a place instruction or position_m")
+    riders = _riders(scene, obj)
+    before_pos, before_yaw = list(obj["position_m"]), float(obj.get("yaw_rad", 0.0))
     pos, yaw, desc = placement.resolve(scene, obj, place)
     obj["position_m"] = pos
     obj["yaw_rad"] = yaw
-    return OpResult(
-        "move_object",
-        f"Moved {obj['name']} ({obj['id']}) {desc}",
-        [obj["id"]],
-        details={"position_m": list(pos), "yaw_rad": yaw},
-    )
+    details = {"position_m": list(pos), "yaw_rad": yaw}
+    desc += _clear(scene, obj, op, place, details)
+    _carry(riders, obj, before_pos, before_yaw)
+    ids = [obj["id"]] + [r["id"] for r in riders]
+    if riders:
+        desc += " (with " + ", ".join(r["name"] for r in riders) + " on it)"
+    return OpResult("move_object", f"Moved {obj['name']} ({obj['id']}) {desc}", ids, details=details)
 
 
 def op_rotate_object(scene: dict, op: dict) -> OpResult:
@@ -485,8 +538,11 @@ def op_rotate_object(scene: dict, op: dict) -> OpResult:
         yaw = placement.facing_yaw(scene, str(op["facing"]))
     else:
         raise SceneError("missing_field", "rotate_object needs yaw_rad, yaw_deg, by_deg, by_rad or facing")
+    riders = _riders(scene, obj)
+    before_pos, before_yaw = list(obj["position_m"]), float(obj.get("yaw_rad", 0.0))
     obj["yaw_rad"] = g.normalize_yaw(yaw)
-    return OpResult("rotate_object", f"Rotated {obj['name']} ({obj['id']}) to {math.degrees(obj['yaw_rad']):.0f}°", [obj["id"]])
+    _carry(riders, obj, before_pos, before_yaw)
+    return OpResult("rotate_object", f"Rotated {obj['name']} ({obj['id']}) to {math.degrees(obj['yaw_rad']):.0f}°", [obj["id"]] + [r["id"] for r in riders])
 
 
 def op_duplicate_object(scene: dict, op: dict) -> OpResult:
@@ -497,20 +553,27 @@ def op_duplicate_object(scene: dict, op: dict) -> OpResult:
     dup["locked"] = False
     if op.get("name"):
         dup["name"] = _str(op["name"], "name")
-    if isinstance(op.get("place"), dict):
-        dup["position_m"], dup["yaw_rad"], desc = placement.resolve(scene, dup, op["place"])
-    else:
-        dup["position_m"], dup["yaw_rad"], desc = placement.resolve(scene, dup, {"next_to": src["id"], "side": "right", "gap_m": 0.1})
+    place = op["place"] if isinstance(op.get("place"), dict) else {"next_to": src["id"], "side": "right", "gap_m": 0.1}
+    dup["position_m"], dup["yaw_rad"], desc = placement.resolve(scene, dup, place)
     scene["objects"].append(dup)
-    return OpResult("duplicate_object", f"Duplicated {src['name']} as {dup['id']}, {desc}", [dup["id"]], created_id=dup["id"])
+    details: dict = {"position_m": list(dup["position_m"]), "yaw_rad": dup["yaw_rad"]}
+    desc += _clear(scene, dup, op, place, details)
+    return OpResult("duplicate_object", f"Duplicated {src['name']} as {dup['id']}, {desc}", [dup["id"]], created_id=dup["id"], details=details)
 
 
 def op_remove_object(scene: dict, op: dict) -> OpResult:
     _require(op, "id")
     obj = m.find_object(scene, str(op["id"]))
     _unlocked(obj, op)
+    riders = _riders(scene, obj)
     scene["objects"] = [o for o in scene["objects"] if o["id"] != obj["id"]]
-    return OpResult("remove_object", f"Removed {obj['name']} ({obj['id']})", [obj["id"]])
+    note = ""
+    if riders:  # what sat on it is now on the floor; say so rather than leave it floating
+        for rd in riders:
+            rd["position_m"][1] = 0.0
+            rd["mount"] = "floor"
+        note = "; " + ", ".join(r["name"] for r in riders) + " now on the floor"
+    return OpResult("remove_object", f"Removed {obj['name']} ({obj['id']}){note}", [obj["id"]] + [r["id"] for r in riders])
 
 
 def op_swap_objects(scene: dict, op: dict) -> OpResult:

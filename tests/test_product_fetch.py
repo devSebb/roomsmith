@@ -55,8 +55,9 @@ def test_shopify_store_falls_back_to_product_json_and_bed_axes():
     assert g.calls[0].endswith("/products/the-bed-frame.js") and len(g.calls) == 1  # JSON first; HTML not needed
     assert r["title"] == "The Bed Frame" and r["price"] == "1070.00"
     assert r["image_url"] == "https://cdn.shopify.com/s/files/bed-1.jpg"
-    # first readable line is the Twin; a bed's L is its length (depth)
-    assert round(r["dimensions_m"][0], 2) == 1.14 and round(r["dimensions_m"][2], 2) == 2.18
+    # the user asked about a double: the Full/Queen line wins over the Twin; a bed's L is its length (depth)
+    assert round(r["dimensions_m"][0], 2) == 1.70 and round(r["dimensions_m"][2], 2) == 2.18
+    assert pf.fetch_product("https://floyd.example.com/products/the-bed-frame", category="bed_single", _get=g)["dimensions_m"][0] == 1.143
 
 
 def test_opengraph_only_page():
@@ -114,3 +115,40 @@ def test_add_product_from_url_alone(tmp_path, monkeypatch):
     r2 = s.add_product(pid, title="", url="https://www.thuma.co/products/the-bed")
     assert r2["ok"] is False and r2["error"]["code"] == "dimensions_not_found" and r2["error"]["fetched"]["title"] == "Classic Bed"
     assert len(s.scene(pid)["scene"]["objects"]) == 1
+
+
+SCRIPT_PAGE = r"""<!doctype html><html><head><title>Neva Sofa</title><meta property="og:title" content="Neva Sofa">
+<script src="/app.js"></script>
+<script>window.sections = {"dimensions":{"html":"<ul>\n<li>Overall dimensions: 84”W x 41”D x 33”H<\/li>\n<li>Seat height: 18”<\/li><\/ul>"}};</script>
+<script>self.__next_f.push([1,"{\"_168\":145},\"Classic Bed (1 of 2) - 83” x 13” x 5”\",[],\"\\nQueen: 68” W x 93” D x 11.6” H\",\"King: 84” W x 93” D x 11.6” H\""])</script>
+</head><body><h1>Neva Sofa</h1><p>Soft.</p></body></html>""".encode()
+
+DESK_PAGE = b"""<html><head><title>Tria Standing Desk</title></head><body><h1>Desk</h1><select><option>48 inches x 27 inches Desk Size</option></select></body></html>"""
+
+
+def test_dimensions_buried_in_inline_scripts_and_variant_preference():
+    g = fake_get({"neva": SCRIPT_PAGE})
+    r = pf.fetch_product("https://sixpenny.example.com/neva", category="sofa", _get=g)
+    assert r["ok"] and r["dimensions_text"].startswith("Overall dimensions: 84”W x 41”D x 33”H")
+    assert [round(v, 3) for v in r["dimensions_m"]] == [2.134, 0.838, 1.041]
+    # a queen bed: the Queen line wins over the shipping-box line and the King line
+    r = pf.fetch_product("https://sixpenny.example.com/neva", category="bed_queen", _get=g)
+    assert r["dimensions_text"] == "Queen: 68” W x 93” D x 11.6” H" and round(r["dimensions_m"][2], 3) == 2.362
+    r = pf.fetch_product("https://sixpenny.example.com/neva", category="bed_king", _get=g)
+    assert r["dimensions_text"].startswith("King: 84”")
+
+
+def test_shopify_json_without_sizes_falls_through_to_the_page():
+    g = fake_get({"neva-sofa-84.js": json.dumps({"title": "Neva Sofa", "price": 289900, "images": [], "description": "<p>Soft.</p>"}).encode(), "neva-sofa-84": SCRIPT_PAGE})
+    r = pf.fetch_product("https://sixpenny.example.com/products/neva-sofa-84", category="sofa", _get=g)
+    assert len(g.calls) == 2 and r["source"] == "shopify" and r["price"] == "2899.00"
+    assert r["dimensions_text"].startswith("Overall dimensions: 84”W")
+
+
+def test_footprint_only_takes_the_usual_height_for_the_category():
+    r = pf.fetch_product("https://desks.example.com/tria", category="desk", _get=fake_get({"tria": DESK_PAGE}))
+    assert r["ok"] and [round(v, 3) for v in r["dimensions_m"]] == [1.219, 0.75, 0.686]
+    assert r["dims"]["height_assumed"] is True and any("usual desk height" in n for n in r["notes"])
+    # without a category there is nothing to assume: no dimensions, honest note
+    r2 = pf.fetch_product("https://desks.example.com/tria", _get=fake_get({"tria": DESK_PAGE}))
+    assert r2["dimensions_m"] is None

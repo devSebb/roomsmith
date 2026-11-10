@@ -145,10 +145,12 @@ the room facing that wall.
 - HEIC photos are not read yet; export as JPEG/PNG first.
 - Rooms are polygons in the data model but the editor resizes rectangles only.
 - Product pages: the plugin reads structured data (schema.org Product, Shopify
-  product JSON, OpenGraph) and the visible text. Verified live on castlery.com
-  (size, price, photo). Sites behind bot checks (Article, Wayfair-style WAFs) or
-  with sizes only in JavaScript (Thuma) return the title and photo but ask you
-  for the printed size. The plugin never invents a size.
+  product JSON, OpenGraph), the visible text and the spec text modern stores keep
+  in inline scripts. Read correctly live: Castlery, Sixpenny, Albany Park, Thuma,
+  Branch (size, price, photo). Sites behind bot checks (Article, Wayfair-style
+  WAFs, rate limiters) return an error that says so and Hermes asks you for the
+  printed size. The plugin never invents a size; when a page prints only a
+  footprint (desk tops) the category's usual height is used and said.
 - Hermes Desktop: the full-page editor needs one app restart after enabling; the
   Desktop's own right-click menu owns right-click on the canvas (pan with ⇧-drag
   or the middle button).
