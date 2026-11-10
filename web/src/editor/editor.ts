@@ -111,9 +111,15 @@ export class Editor {
     el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation() })
     this.ro = new ResizeObserver(() => this.resize())
     this.ro.observe(container)
+    // Chromium suspends ResizeObserver/rAF while the window is hidden; a pane mounted in the
+    // background keeps a stale canvas size, so re-measure when we become visible again.
+    this.onVisible = () => { if (!this.disposed && document.visibilityState === 'visible') { this.resize(); this.render() } }
+    window.addEventListener('focus', this.onVisible)
+    document.addEventListener('visibilitychange', this.onVisible)
     this.resize()
     this.loop(0)
   }
+  private onVisible: () => void = () => {}
 
   // ------------------------------------------------------------ lifecycle
 
@@ -159,6 +165,8 @@ export class Editor {
   private orthoZoom = 1
 
   dispose() {
+    window.removeEventListener('focus', this.onVisible)
+    document.removeEventListener('visibilitychange', this.onVisible)
     this.disposed = true
     cancelAnimationFrame(this.raf)
     this.ro.disconnect()
