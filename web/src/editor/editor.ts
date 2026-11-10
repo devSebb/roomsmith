@@ -18,6 +18,7 @@ export interface EditorCallbacks {
   onUndo?: () => void
   onRedo?: () => void
   onViewChange?: (mode: ViewMode) => void
+  onLabelsChange?: (on: boolean) => void
   onSelectOpening?: (id: string | null) => void
   onSelectWall?: (id: string | null) => void
   onDragState?: (dragging: boolean, snapped: string | null, bad: boolean) => void
@@ -257,12 +258,19 @@ export class Editor {
     if (first || (outlineChanged && !this.drag)) this.frameRoom() // new room, or its walls moved (calibration, resize): re-frame
   }
 
+  /** Show or hide every object's name tag. Hidden mode still tags the selected and
+   *  hovered object, so "hide all" never loses what you are pointing at. */
   setLabels(on: boolean) {
     this.showLabels = on
-    for (const v of this.objects.values()) {
-      if (on && !v.label) v.setLabel(this.theme)
-      if (!on && v.label) { v.group.remove(v.label); v.label = null }
-    }
+    for (const id of this.objects.keys()) this.syncLabel(id)
+    this.render()
+  }
+  private syncLabel(id: string) {
+    const v = this.objects.get(id)
+    if (!v) return
+    const want = this.showLabels || id === this.selected || id === this.hovered
+    if (want && !v.label) v.setLabel(this.theme)
+    if (!want && v.label) { v.group.remove(v.label); v.label = null }
   }
 
   flash(ids: string[]) {
@@ -386,6 +394,7 @@ export class Editor {
   private applyHighlight(id: string) {
     const v = this.objects.get(id)
     if (!v) return
+    if (!this.showLabels) this.syncLabel(id)
     if (this.flashing.has(id)) return v.setHighlight('flash', this.theme)
     if (this.drag?.id === id && this.drag.bad) return v.setHighlight('bad', this.theme)
     if (id === this.selected) return v.setHighlight('selected', this.theme)
@@ -520,6 +529,7 @@ export class Editor {
       return
     }
     if (e.key.toLowerCase() === 'v' && !mod) { e.preventDefault(); this.setMode(this.mode === '3d' ? 'plan' : '3d'); return }
+    if (e.key.toLowerCase() === 'l' && !mod) { e.preventDefault(); this.setLabels(!this.showLabels); this.cb.onLabelsChange?.(this.showLabels); return }
     if (e.key.toLowerCase() === 'f' && !mod) { e.preventDefault(); if (id) this.focus(id); else this.frameRoom(); return }
     if (e.key === 'Escape') { this.select(null); this.cb.onSelectOpening?.(null); this.cb.onSelectWall?.(null); return }
     if (this.mode === 'plan' && (e.key === '+' || e.key === '=' || e.key === '-')) {

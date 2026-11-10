@@ -66,6 +66,7 @@ export function App(props: AppProps) {
       onUndo: () => store.undo(),
       onRedo: () => store.redo(),
       onViewChange: m => setMode(m),
+      onLabelsChange: on => setLabels(on),
       onSelectOpening: id => { store.selectOpening(id); if (id) setTab('room') },
       onSelectWall: id => { store.selectWall(id); if (id) setTab('room') },
       onDragState: (on, snapped, bad) => setDrag({ on, snapped, bad }),
@@ -98,7 +99,7 @@ export function App(props: AppProps) {
         <button className={'rs-btn sm' + (mode === '3d' ? ' on' : '')} onClick={() => ed?.setMode('3d')} title="3D view (V)">3D</button>
         <button className={'rs-btn sm' + (mode === 'plan' ? ' on' : '')} onClick={() => ed?.setMode('plan')} title="Plan view (V)">Plan</button>
         <button className="rs-btn sm" onClick={() => { if (s.selectedId) ed?.focus(s.selectedId); else ed?.frameRoom() }} title="Frame (F)">⌖</button>
-        <button className={'rs-btn sm' + (labels ? ' on' : '')} onClick={() => { setLabels(!labels); ed?.setLabels(!labels) }} title="Labels">Aa</button>
+        <button className={'rs-btn sm' + (labels ? ' on' : '')} onClick={() => { setLabels(!labels); ed?.setLabels(!labels) }} title={labels ? 'Hide all labels (L) — the selected object keeps its tag' : 'Show all labels (L)'}>{labels ? 'Labels on' : 'Labels off'}</button>
         <span className="rs-spacer" />
         <button className="rs-btn sm" disabled={!s.canUndo} onClick={() => store.undo()} title="Undo (⌘Z)">↶ Undo</button>
         <button className="rs-btn sm" disabled={!s.canRedo} onClick={() => store.redo()} title="Redo (⇧⌘Z)">↷ Redo</button>
@@ -117,7 +118,7 @@ export function App(props: AppProps) {
             <NewRoom store={store} api={props.api} compact />
           </div>
         )}
-        {scene && <div className="rs-help">drag to move · ⇧drag pan · wheel zoom · R rotate · ⌫ delete · ⌘D duplicate · ⌘Z undo · V view · F frame</div>}
+        {scene && <div className="rs-help">drag to move · ⇧drag pan · wheel zoom · R rotate · ⌫ delete · ⌘D duplicate · ⌘Z undo · V view · F frame · L labels</div>}
         <div className="rs-toasts">{s.toasts.map(t => <div key={t.id} className={'rs-toast ' + t.kind} onClick={() => t.ids?.[0] && store.select(t.ids[0])}>{t.text}</div>)}</div>
       </div>
       <div className="rs-panel">

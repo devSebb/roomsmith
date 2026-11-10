@@ -120,3 +120,7 @@ Built 2026-11-07, hackathon week.
   through to the page. Read correctly live from the MacBook: Castlery (Hamilton
   sofa, Casa dining table), Sixpenny (Neva sofa, Neva chair), Albany Park (Kova
   sofas), Thuma (Classic Bed, queen), Branch (Tria desk, Ergonomic chair).
+- 2026-11-10 (later): editor toolbar **Labels on/off** (also the `L` key) hides every
+  name tag at once; the selected or hovered object keeps its tag so you never lose
+  what you are pointing at. Asked for by Sebb during the Desktop dry run — the old
+  "Aa" button did this but nobody found it.
