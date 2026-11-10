@@ -7,7 +7,7 @@ export interface Opening {
   offset_m: number; width_m: number; height_m: number; sill_m: number;
   swing?: 'in' | 'out' | 'none'; hinge?: 'left' | 'right'; dims_source?: string
 }
-export interface Product { title?: string; url?: string | null; image_url?: string | null; price?: string | null; dimensions_text?: string | null; assumed_order?: boolean }
+export interface Product { title?: string; url?: string | null; image_url?: string | null; image_data?: string | null; price?: string | null; dimensions_text?: string | null; assumed_order?: boolean; source?: string | null }
 export interface SceneObject {
   id: string; name: string; category: string; shape: 'box' | 'cylinder';
   dimensions_m: [number, number, number]; position_m: [number, number, number]; yaw_rad: number;

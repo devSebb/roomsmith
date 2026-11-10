@@ -32,6 +32,7 @@ capabilities:
     - roomsmith_inspect
     - roomsmith_apply
     - roomsmith_check
+    - roomsmith_read_product
     - roomsmith_add_product
     - roomsmith_history
     - roomsmith_export

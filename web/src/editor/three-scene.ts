@@ -63,9 +63,33 @@ export class ObjectView {
     this.mesh.userData.objectId = obj.id
     this.edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18 }))
     this.group.add(this.mesh, this.edges)
+    if (obj.product?.image_data) this.addProductCard(obj.product.image_data, w, h, d)
     if (showLabels) this.setLabel(theme)
     this.group.userData.objectId = obj.id
     this.snapTo(obj)
+  }
+  /** The product's photo on the stand-in: on the front face, or on top for flat things (rugs). */
+  private addProductCard(dataUrl: string, w: number, h: number, d: number) {
+    const tex = new THREE.TextureLoader().load(dataUrl, t => {
+      const img = t.image as { width: number; height: number }
+      if (!img?.width || !img?.height) return
+      const flat = h < 0.15
+      const faceW = flat ? w : w, faceH = flat ? d : h
+      const ar = img.width / img.height
+      let pw = faceW * 0.96, ph = pw / ar
+      if (ph > faceH * 0.94) { ph = faceH * 0.94; pw = ph * ar }
+      plane.scale.set(pw, ph, 1)
+      t.colorSpace = THREE.SRGBColorSpace
+      t.needsUpdate = true
+    })
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.98, depthWrite: false })
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat)
+    plane.userData.objectId = this.obj.id
+    if (h < 0.15) { plane.rotation.x = -Math.PI / 2; plane.position.set(0, h + 0.003, 0) } // flat: lie on top
+    else plane.position.set(0, h / 2, -d / 2 - 0.004) // front face is -Z
+    if (h >= 0.15) plane.rotation.y = Math.PI // face outward from -Z
+    plane.renderOrder = 2
+    this.group.add(plane)
   }
   setLabel(theme: Theme) {
     if (this.label) this.group.remove(this.label)
@@ -98,7 +122,7 @@ export class ObjectView {
   }
   sameShape(o: SceneObject) {
     const a = this.obj, b = o
-    return a.shape === b.shape && a.color === b.color && a.name === b.name && a.dimensions_m.every((v, i) => Math.abs(v - b.dimensions_m[i]) < 1e-6)
+    return a.shape === b.shape && a.color === b.color && a.name === b.name && (a.product?.image_data || null) === (b.product?.image_data || null) && a.dimensions_m.every((v, i) => Math.abs(v - b.dimensions_m[i]) < 1e-6)
   }
   setHighlight(mode: 'none' | 'selected' | 'hover' | 'bad' | 'flash', theme: Theme) {
     const m = this.mesh.material as THREE.MeshStandardMaterial

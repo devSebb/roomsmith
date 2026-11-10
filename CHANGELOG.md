@@ -48,6 +48,14 @@ Built 2026-11-07, hackathon week.
   `next_step` tells the agent to review draft issues with the user, not fix them
   blindly. S1 chat smoke passed on the Mini; `--image` is rejected by the gateway
   CLI (S6 blocked there; path route works).
+- **Products from links, read by the plugin** (`rs_core/product_fetch.py`): schema.org
+  Product JSON-LD, Shopify product JSON, OpenGraph and visible text, stdlib only,
+  one request to the pasted URL; bot-check pages and refusals come back as
+  `blocked`, pages without printed sizes as `dimensions_not_found` — never a
+  guess. New tool `roomsmith_read_product`; `roomsmith_add_product` accepts a
+  URL alone and adds a true-size stand-in wearing the product's photo (thumbnail
+  cached in plugin data, composited on white), name, price and link. Live on
+  castlery.com. Dimension parser reads glued labels (`W88.6" x D39.4"`).
 - `roomsmith_check fits_at`: `object_id` + `dimensions_m` now tests a replacement
   (new size where the old object stands, hugging the same wall, old object
   ignored) and the result names what it replaces; an overlap without

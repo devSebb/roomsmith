@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from rs_core import dims as dims_mod
+from rs_core import product_fetch
 from rs_core import geometry as g
 from rs_core import export_glb, fitcheck, layout, ops, summarize, validate
 from rs_core import model as m
@@ -389,8 +390,20 @@ class RoomService:
         if not pid:
             return self._no_project(project_id)
         title = (title or "").strip()
+        fetched: dict | None = None
+        if url and dimensions_m is None and not dimensions_text:
+            # the agent gave us only a link: read the page ourselves
+            fetched = self.read_product(url, category=category or title or None)
+            if not fetched.get("ok"):
+                return fetched
+            title = title or fetched.get("title") or ""
+            price = price or fetched.get("price")
+            image_url = image_url or fetched.get("image_url")
+            dimensions_text = fetched.get("dimensions_text")
+            if not dimensions_text:
+                return _err("dimensions_not_found", f"Read the page for {title or url!r} (title, price, image) but it prints no readable dimensions. Ask the user for the size, then call again with dimensions_m.", fetched={k: fetched.get(k) for k in ("title", "price", "image_url", "source")})
         if not title:
-            return _err("missing_field", "title is required")
+            return _err("missing_field", "title is required (or give a url to read it from)")
         parsed = None
         if dimensions_m is None and dimensions_text:
             parsed = dims_mod.parse_dimensions(dimensions_text, category=normalize_category(category or title))
@@ -408,7 +421,11 @@ class RoomService:
             "price": price or None,
             "dimensions_text": dimensions_text or None,
             "assumed_order": bool(parsed and parsed.get("assumed_order")),
+            "source": (fetched or {}).get("source"),
         }
+        thumb = self.product_thumbnail(image_url) if image_url else None
+        if thumb:
+            product["image_data"] = thumb
         op: dict = {
             "op": "add_object",
             "name": title[:60],
@@ -438,6 +455,60 @@ class RoomService:
         return res
 
     # ------------------------------------------------------------ photos
+
+    # ------------------------------------------------------------------ products from links
+
+    def read_product(self, url: str, category: str | None = None) -> dict:
+        """Read a product page the user pasted: title, price, image, dimensions (if printed)."""
+        out = product_fetch.fetch_product(url, category=normalize_category(category) if category else None)
+        if out.get("ok") and out.get("dimensions_m"):
+            out["text"] = f"{out.get('title') or url}: {out['dimensions_text']} -> {out['dimensions_m'][0]:.2f} x {out['dimensions_m'][1]:.2f} x {out['dimensions_m'][2]:.2f} m (w x h x d)" + (f", {out['price']}" if out.get("price") else "")
+        elif out.get("ok"):
+            out["text"] = f"{out.get('title') or url}: no printed dimensions found on the page; ask the user for the size."
+        return out
+
+    def product_thumbnail(self, image_url: str, max_px: int = 384, max_bytes: int = 120_000) -> str | None:
+        """Fetch a product image once and return a small data URL for the editor's stand-in
+        (cached on disk under products/). None when it cannot be fetched or shrunk enough."""
+        if not image_url or not str(image_url).startswith(("http://", "https://")):
+            return None
+        key = hashlib.sha256(image_url.encode()).hexdigest()[:16]
+        cache = self.data_dir / "products"
+        cache.mkdir(parents=True, exist_ok=True)
+        cached = cache / f"{key}.txt"
+        if cached.exists():
+            return cached.read_text() or None
+        try:
+            data, ctype, _ = product_fetch._get(image_url, timeout=10, accept="image/*")  # noqa: SLF001 (same package)
+        except product_fetch.FetchError:
+            return None
+        kind = sniff_image(data)
+        if kind is None:
+            return None
+        out_bytes, mime = data, {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}[kind]
+        try:
+            import io
+
+            from PIL import Image
+
+            im = Image.open(io.BytesIO(data)).convert("RGBA")
+            bg = Image.new("RGBA", im.size, (255, 255, 255, 255))  # product shots often have a transparent background
+            bg.alpha_composite(im)
+            im = bg.convert("RGB")
+            im.thumbnail((max_px, max_px))
+            buf = io.BytesIO()
+            im.save(buf, format="JPEG", quality=82)
+            out_bytes, mime = buf.getvalue(), "image/jpeg"
+        except Exception:  # noqa: BLE001 - no Pillow or odd image: keep the original if it is small
+            pass
+        if len(out_bytes) > max_bytes:
+            cached.write_text("")
+            return None
+        import base64
+
+        url = f"data:{mime};base64," + base64.b64encode(out_bytes).decode("ascii")
+        cached.write_text(url)
+        return url
 
     def register_photo(self, source_path: str | Path, project_id: str | None = None, photo_id: str | None = None) -> dict:
         """Copy an image into the data folder and record it. No decoding here."""

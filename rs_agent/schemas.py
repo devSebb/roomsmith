@@ -209,14 +209,32 @@ CHECK = {
     },
 }
 
+READ_PRODUCT = {
+    "name": "roomsmith_read_product",
+    "description": (
+        "Read a product page the user pasted (one request to that URL only): title, price, image and the printed dimensions, parsed to metres. "
+        "Use it to answer 'would this fit?' (then roomsmith_check with its dimensions_m) before adding anything. "
+        "Works on pages with schema.org Product data, Shopify stores and plain HTML; bot-protected or JavaScript-only shops return dims null -> ask the user for the size printed on the page. "
+        "Never state product sizes from memory as if they came from the page."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string"},
+            "category": {"type": "string", "description": "sofa, bed_double, desk, ... when the user said what it is (a bed's 'L' is its length)"},
+        },
+        "required": ["url"],
+    },
+}
+
 ADD_PRODUCT = {
     "name": "roomsmith_add_product",
     "description": (
-        "Add a real product as a true-size stand-in box. First read the product page (web_extract/fetch/browser; if your only web tool is search-only, "
-        "fetch the HTML with curl in the terminal) and extract the title, the dimensions text exactly as written (e.g. 'Width: 228 cm, Depth: 95 cm, Height: 83 cm' "
-        "or '71\" W x 35\" D x 30\" H'), the price and a product image URL; then call this with dimensions_text (and category when obvious: a bed's 'L' is its length). "
-        "The plugin parses the dimensions in code and reports clearance and whether it passes the door. "
-        "If you cannot read the page, ask the user for the printed sizes and pass dimensions_m; never pass sizes from memory as dimensions_text."
+        "Add a real product as a true-size stand-in box with its name, price, link and picture. Give the url alone and the plugin reads the page itself "
+        "(title, price, image, printed dimensions). Or give dimensions_text exactly as written on the page (e.g. 'Width: 228 cm, Depth: 95 cm, Height: 83 cm' "
+        "or 'W88.6\" x D39.4\" x H32.3\"') / dimensions_m from the user, plus title. Pass category when obvious (a bed's 'L' is its length). "
+        "The plugin parses sizes in code and reports clearance and whether it passes the door. "
+        "If the page prints no dimensions the reply says so: ask the user for the size, never use sizes from memory as dimensions_text."
     ),
     "parameters": {
         "type": "object",
@@ -233,7 +251,7 @@ ADD_PRODUCT = {
             "place": _PLACE,
             "expected_revision": {"type": "integer"},
         },
-        "required": ["title"],
+        "required": [],
     },
 }
 
@@ -264,5 +282,5 @@ EXPORT = {
     },
 }
 
-ALL = [PROJECTS, NEW_ROOM, FROM_PHOTO, INSPECT, APPLY, CHECK, ADD_PRODUCT, HISTORY, EXPORT]
+ALL = [PROJECTS, NEW_ROOM, FROM_PHOTO, INSPECT, APPLY, CHECK, READ_PRODUCT, ADD_PRODUCT, HISTORY, EXPORT]
 TOOL_NAMES = [t["name"] for t in ALL]

@@ -25,9 +25,10 @@ before you buy.
   is a numbered revision with undo; Hermes sees what you changed by hand, and
   you see what Hermes changed (it glides into place with a note), and when
   Hermes creates or opens another room the editor follows.
-- **Real products at true size.** Give Hermes a link; it reads the page with its
-  own web tools and the plugin parses the dimensions (cm, mm, m, inches, feet)
-  into a stand-in box with the product name, price and link.
+- **Real products at true size.** Paste a link; the plugin reads the page's
+  product data (title, price, photo, printed dimensions in cm/mm/m/in/ft) and
+  puts a true-size stand-in in the room wearing the product's photo, with the
+  name, price and link. No size on the page? It asks you, never guesses.
 - **Fit checks by geometry, not guesswork.** Overlaps, things outside the room,
   blocked doors and windows, tight walkways, too-tall objects; "will this fit
   against that wall, with how much to spare", "where could it fit", "will it
@@ -122,10 +123,13 @@ the room facing that wall.
 
 ## Privacy and safety
 
-- **Network:** the plugin makes no network requests of its own. Photos you choose
-  go to your configured Hermes model through Hermes's own model access. Product
-  pages are read by Hermes's web tools, not by the plugin. The editor may load a
-  product image from the address Hermes supplied.
+- **Network:** the plugin makes exactly two kinds of request, both only when you
+  paste a product link: one GET to that URL (plus, for Shopify stores, the store's
+  public product JSON next to it) and one GET for the product's main image, which
+  is shrunk to a small thumbnail and kept in the room's data. Plain `User-Agent:
+  Roomsmith/0.1`, no cookies, no retries against sites that refuse. Photos you
+  choose go to your configured Hermes model through Hermes's own model access;
+  nothing else leaves your machine.
 - **Files:** reads only the image files you name or upload; writes only inside
   `<hermes home>/plugin-data/roomsmith/` and to export paths you ask for.
 - **No** shell commands, background processes, telemetry, credentials, or
@@ -140,11 +144,11 @@ the room facing that wall.
   which fallback it took and asks for the room's measurements.
 - HEIC photos are not read yet; export as JPEG/PNG first.
 - Rooms are polygons in the data model but the editor resizes rectangles only.
-- Furniture is boxes and cylinders, not 3D product models. Product pages are
-  read by Hermes's own tools (a web-extraction backend if configured, else
-  `curl` from the terminal); many shops rate-limit or render with JavaScript,
-  so the reliable path is pasting the link together with the printed size —
-  the plugin parses the size and keeps the link on the stand-in.
+- Product pages: the plugin reads structured data (schema.org Product, Shopify
+  product JSON, OpenGraph) and the visible text. Verified live on castlery.com
+  (size, price, photo). Sites behind bot checks (Article, Wayfair-style WAFs) or
+  with sizes only in JavaScript (Thuma) return the title and photo but ask you
+  for the printed size. The plugin never invents a size.
 - Hermes Desktop: the full-page editor needs one app restart after enabling; the
   Desktop's own right-click menu owns right-click on the canvas (pan with ⇧-drag
   or the middle button).

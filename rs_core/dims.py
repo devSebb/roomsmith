@@ -74,8 +74,9 @@ _LABEL = r"(?:" + "|".join(sorted((re.escape(k) for k in LABELS), key=len, rever
 _FT_IN = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:ft|feet|foot|'|’)\s*(\d+(?:[.,]\d+)?)?\s*(?:in|inch|inches|\"|”)?", re.I)
 
 # labelled value: "W 180 cm", "Width: 228 cm", "180 cm W", "71\" W"
-_LABEL_FIRST = re.compile(rf"\b({_LABEL})\b\s*[:=]?\s*({_NUM})\s*({_UNIT})?", re.I)
-_VALUE_FIRST = re.compile(rf"({_NUM})\s*({_UNIT})?\s*\b({_LABEL})\b", re.I)
+# labels may be glued to their number ("W88.6\"", "180cmW"): bound them by non-letters, not \b
+_LABEL_FIRST = re.compile(rf"(?<![A-Za-z])({_LABEL})(?![A-Za-z])\s*[:=]?\s*({_NUM})\s*({_UNIT})?", re.I)
+_VALUE_FIRST = re.compile(rf"({_NUM})\s*({_UNIT})?\s*(?<![A-Za-z])({_LABEL})(?![A-Za-z])", re.I)
 _TRIPLE = re.compile(rf"({_NUM})\s*({_UNIT})?\s*(?:x|×|\*|by)\s*({_NUM})\s*({_UNIT})?\s*(?:x|×|\*|by)\s*({_NUM})\s*({_UNIT})?", re.I)
 _PAIR = re.compile(rf"({_NUM})\s*({_UNIT})?\s*(?:x|×|\*|by)\s*({_NUM})\s*({_UNIT})?", re.I)
 _TRAILING_UNIT = re.compile(rf"\b({_UNIT})\b\s*$", re.I)

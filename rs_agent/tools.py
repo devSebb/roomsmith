@@ -169,6 +169,12 @@ def add_product(args: dict, kwargs: dict) -> dict:
 
 
 @_guard
+def read_product(args: dict, kwargs: dict) -> dict:
+    svc = get_service()
+    return svc.read_product(str(args.get("url") or ""), category=args.get("category"))
+
+
+@_guard
 def history(args: dict, kwargs: dict) -> dict:
     svc = get_service()
     action = str(args.get("action") or "list").lower()
