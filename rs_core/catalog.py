@@ -112,6 +112,8 @@ ALIASES = {
     "chandelier": "lamp_ceiling",
     "light fixture": "lamp_ceiling",
     "hanging light": "lamp_ceiling",
+    "ceiling fan": "lamp_ceiling",
+    "fan": "lamp_ceiling",
     "refrigerator": "fridge",
     "stove": "oven",
     "cooker": "oven",

@@ -4,6 +4,7 @@
 import * as THREE from 'three'
 import type { Opening, Scene, SceneObject, Wall } from '../types'
 import { inwardNormal, wallSegment, type P } from './math'
+import { buildShape } from './shapes'
 
 export const WALL_T = 0.08
 const LABEL_SCALE = 0.0035
@@ -48,7 +49,9 @@ function makeLabel(text: string, theme: Theme, sub?: string): THREE.Sprite {
 
 export class ObjectView {
   group = new THREE.Group()
+  /** Invisible bounding box: what the mouse picks and drags. The visible parts are `parts`. */
   mesh: THREE.Mesh
+  parts: THREE.Mesh[] = []
   edges: THREE.LineSegments
   label: THREE.Sprite | null = null
   target = { x: 0, y: 0, z: 0, yaw: 0 }
@@ -56,13 +59,14 @@ export class ObjectView {
     const [w, h, d] = obj.dimensions_m
     const geo = obj.shape === 'cylinder' ? new THREE.CylinderGeometry(Math.min(w, d) / 2, Math.min(w, d) / 2, h, 32) : new THREE.BoxGeometry(w, h, d)
     geo.translate(0, h / 2, 0)
-    const mat = new THREE.MeshStandardMaterial({ color: col(obj.color), roughness: 0.85, metalness: 0.0, transparent: true, opacity: obj.mount === 'ceiling' ? 0.45 : 1 })
-    this.mesh = new THREE.Mesh(geo, mat)
-    this.mesh.castShadow = true
-    this.mesh.receiveShadow = true
+    this.mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }))
     this.mesh.userData.objectId = obj.id
-    this.edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18 }))
-    this.group.add(this.mesh, this.edges)
+    const shape = buildShape(obj)
+    this.parts = shape.meshes
+    this.edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12 }))
+    this.edges.visible = this.parts.length <= 1 // outline only for plain boxes; shaped objects speak for themselves
+    this.group.add(this.mesh, shape.group, this.edges)
+    this.applyOpacity()
     if (obj.product?.image_data) this.addProductCard(obj.product.image_data, w, h, d)
     if (showLabels) this.setLabel(theme)
     this.group.userData.objectId = obj.id
@@ -122,22 +126,25 @@ export class ObjectView {
   }
   sameShape(o: SceneObject) {
     const a = this.obj, b = o
-    return a.shape === b.shape && a.color === b.color && a.name === b.name && (a.product?.image_data || null) === (b.product?.image_data || null) && a.dimensions_m.every((v, i) => Math.abs(v - b.dimensions_m[i]) < 1e-6)
+    return a.shape === b.shape && a.color === b.color && a.name === b.name && a.category === b.category && a.mount === b.mount && a.locked === b.locked && (a.product?.image_data || null) === (b.product?.image_data || null) && a.dimensions_m.every((v, i) => Math.abs(v - b.dimensions_m[i]) < 1e-6)
+  }
+  private applyOpacity() {
+    const o = this.obj.mount === 'ceiling' ? 0.45 : this.obj.locked ? 0.95 : 1 // hanging things must not hide the room under them
+    for (const p of this.parts) { const m = p.material as THREE.MeshStandardMaterial; m.transparent = true; m.opacity = o }
   }
   setHighlight(mode: 'none' | 'selected' | 'hover' | 'bad' | 'flash', theme: Theme) {
-    const m = this.mesh.material as THREE.MeshStandardMaterial
-    m.emissive = new THREE.Color(0x000000)
-    m.emissiveIntensity = 0
-    m.opacity = this.obj.mount === 'ceiling' ? 0.45 : 1 // hanging things must not hide the room under them
-    if (mode === 'selected') { m.emissive = col(theme.accent); m.emissiveIntensity = 0.35 }
-    else if (mode === 'hover') { m.emissive = col(theme.accent); m.emissiveIntensity = 0.15 }
-    else if (mode === 'bad') { m.emissive = col(theme.warn); m.emissiveIntensity = 0.6 }
-    else if (mode === 'flash') { m.emissive = col(theme.accent); m.emissiveIntensity = 0.8 }
-    if (this.obj.locked) m.opacity = 0.95
+    let emissive = new THREE.Color(0x000000), k = 0
+    if (mode === 'selected') { emissive = col(theme.accent); k = 0.35 }
+    else if (mode === 'hover') { emissive = col(theme.accent); k = 0.15 }
+    else if (mode === 'bad') { emissive = col(theme.warn); k = 0.6 }
+    else if (mode === 'flash') { emissive = col(theme.accent); k = 0.8 }
+    for (const p of this.parts) { const m = p.material as THREE.MeshStandardMaterial; if ('emissive' in m) { m.emissive = emissive; m.emissiveIntensity = k } }
+    this.applyOpacity()
   }
   dispose() {
     this.mesh.geometry.dispose()
     ;(this.mesh.material as THREE.Material).dispose()
+    for (const p of this.parts) { p.geometry.dispose(); (p.material as THREE.Material).dispose() }
     this.edges.geometry.dispose()
     if (this.label) { (this.label.material as THREE.SpriteMaterial).map?.dispose(); this.label.material.dispose() }
   }
@@ -174,7 +181,12 @@ export function buildRoom(scene: Scene, theme: Theme): RoomViews {
   const floorGeo = new THREE.ShapeGeometry(shape)
   floorGeo.rotateX(-Math.PI / 2)
   floorGeo.computeVertexNormals()
-  const floorMat = new THREE.MeshStandardMaterial({ color: col(scene.room.floor.color, '#b08d62'), roughness: 0.95, side: THREE.DoubleSide })
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, side: THREE.DoubleSide, map: plankTexture(col(scene.room.floor.color, '#b08d62')) }) // the map carries the colour
+  // planar UVs in metres so the planks repeat at real size
+  const uv = floorGeo.attributes.position
+  const uvs = new Float32Array(uv.count * 2)
+  for (let i = 0; i < uv.count; i++) { uvs[i * 2] = uv.getX(i); uvs[i * 2 + 1] = uv.getZ(i) }
+  floorGeo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
   const floor = new THREE.Mesh(floorGeo, floorMat)
   floor.receiveShadow = true
   floor.userData.floor = true
@@ -200,9 +212,15 @@ export function buildRoom(scene: Scene, theme: Theme): RoomViews {
       mesh.rotation.y = yaw
       mesh.userData.wallId = wall.id
       mesh.receiveShadow = true
-      mesh.castShadow = true
+      mesh.castShadow = false // walls would shade the whole interior from the outside sun; furniture still casts
       list.push(mesh)
       group.add(mesh)
+      if (y0 < 1e-6) { // skirting board along floor-touching pieces
+        const sk = new THREE.Mesh(new THREE.BoxGeometry(len, 0.09, 0.012), new THREE.MeshStandardMaterial({ color: 0xf6f4ef, roughness: 0.8 }))
+        sk.position.set(a[0] + dir[0] * (s + len / 2) + n[0] * 0.006, 0.045, a[1] + dir[1] * (s + len / 2) + n[1] * 0.006)
+        sk.rotation.y = yaw
+        group.add(sk)
+      }
     }
     wallMeshes.set(wall.id, list)
     // plan-view line with label
@@ -262,6 +280,35 @@ function doorArc(o: Opening, a: P, dir: P, n: P, theme: Theme) {
   pts.push(new THREE.Vector3(hx, 0.012, hz))
   const geo = new THREE.BufferGeometry().setFromPoints(pts)
   return new THREE.Line(geo, new THREE.LineDashedMaterial({ color: col(theme.muted), dashSize: 0.08, gapSize: 0.05 }))
+}
+
+/** Procedural plank texture tinted with the floor colour; 1 texture unit = 1 m. */
+function plankTexture(base: THREE.Color): THREE.Texture {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 512
+  const ctx = c.getContext('2d')!
+  const hsl = { h: 0, s: 0, l: 0 }; base.getHSL(hsl, THREE.SRGBColorSpace) // in sRGB, not the linear working space, or the planks come out dark
+  const plankW = 512 / 6 // 6 planks per metre across (≈17 cm boards)
+  for (let i = 0; i < 6; i++) {
+    const seg = 2 + (i % 2)          // 2–3 boards per metre along
+    const offset = (i * 97) % 512
+    for (let j = 0; j < seg; j++) {
+      const l = Math.max(0.08, Math.min(0.9, hsl.l + (((i * 7 + j * 13) % 9) - 4) * 0.011))
+      ctx.fillStyle = `hsl(${hsl.h * 360}, ${hsl.s * 100}%, ${l * 100}%)`
+      const y0 = ((offset + (j * 512) / seg) % 512)
+      ctx.fillRect(i * plankW, y0, plankW, 512 / seg)
+      if (y0 + 512 / seg > 512) ctx.fillRect(i * plankW, 0, plankW, y0 + 512 / seg - 512)
+    }
+    // grain lines
+    ctx.strokeStyle = `hsla(${hsl.h * 360}, ${hsl.s * 100}%, ${Math.max(0, hsl.l - 0.12) * 100}%, 0.35)`
+    ctx.lineWidth = 1
+    for (let g = 0; g < 7; g++) { ctx.beginPath(); const x = i * plankW + ((g * 29 + i * 11) % plankW); ctx.moveTo(x, 0); ctx.lineTo(x + ((g % 3) - 1) * 6, 512); ctx.stroke() }
+    ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fillRect(i * plankW, 0, 1.5, 512) // board gap
+  }
+  const tex = new THREE.CanvasTexture(c)
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.anisotropy = 4
+  return tex
 }
 
 export function disposeGroup(g: THREE.Object3D) {

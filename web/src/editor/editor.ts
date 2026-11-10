@@ -118,11 +118,12 @@ export class Editor {
   // ------------------------------------------------------------ lifecycle
 
   private buildLights() {
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.9)
-    const sun = new THREE.DirectionalLight(0xffffff, 1.4)
+    const hemi = new THREE.HemisphereLight(0xfff4e6, 0x6b7a8a, 1.0)
+    const sun = new THREE.DirectionalLight(0xfff1dd, 1.25)
     sun.position.set(6, 10, 4)
     sun.castShadow = true
     sun.shadow.mapSize.set(2048, 2048)
+    sun.shadow.radius = 4
     sun.shadow.camera.near = 0.5
     sun.shadow.camera.far = 50
     sun.shadow.camera.left = sun.shadow.camera.bottom = -14

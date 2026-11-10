@@ -48,6 +48,14 @@ Built 2026-11-07, hackathon week.
   `next_step` tells the agent to review draft issues with the user, not fix them
   blindly. S1 chat smoke passed on the Mini; `--image` is rejected by the gateway
   CLI (S6 blocked there; path route works).
+- **Procedural furniture** (`web/src/editor/shapes.ts`): a dozen shape families built
+  from the measured size — beds (frame, mattress, pillows, headboard), seating
+  (seat, cushions, back, arms, legs), chairs, tables and desks, drawers and
+  doors with handles, shelving, floor/table lamps, pendants and ceiling fans,
+  plants, TVs, mirrors/pictures, tubs, rugs; unknown categories stay boxes.
+  Plank floor from a procedural texture at real scale, skirting boards, warmer
+  light; walls no longer shade the interior. The picked/dragged volume is still
+  the object's bounding box. Bundle 606 KB.
 - **Products from links, read by the plugin** (`rs_core/product_fetch.py`): schema.org
   Product JSON-LD, Shopify product JSON, OpenGraph and visible text, stdlib only,
   one request to the pasted URL; bot-check pages and refusals come back as
