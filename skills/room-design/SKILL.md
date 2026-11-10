@@ -60,14 +60,25 @@ numbered revision with undo.
 
 ## Products from links
 
-1. Read the page with your own web tools. Extract: title, the dimensions
-   text exactly as written, price, and the main product image URL.
+1. Read the page. Use a page-reading tool if you have one (`web_extract`,
+   `fetch`, browser). If the only web tool is search-only, fetch the HTML from
+   the terminal instead — `curl -sL <url> | sed 's/<[^>]*>/ /g' | grep -i -E
+   'overall|dimensions|[0-9]+ ?(cm|in|") ?[WwDdHhLl]'` — and read the
+   dimensions out of that. Extract: title, the dimensions text exactly as
+   written, price, and the main product image URL.
 2. `roomsmith_add_product` with `dimensions_text` (the plugin parses cm,
-   mm, m, inches, feet; labelled or unlabelled). If the reply says
-   `assumed_order`, tell the user the sizes were read as width x depth x
-   height and ask if that matches the listing.
+   mm, m, inches, feet; labelled or unlabelled) and `category` when the title
+   makes it obvious (bed, sofa…). If the reply says `assumed_order`, tell the
+   user the sizes were read as width x depth x height and ask if that matches.
 3. Report the reply's `clearance_m` and `passes_door` in plain words.
-4. No dimensions on the page → ask the user, then pass `dimensions_m`.
+4. Could not read the page at all → say so and ask the user for the sizes
+   printed on it, then pass `dimensions_m`. **Never state product dimensions
+   from memory as if they came from the page**; if you must estimate, say
+   "estimated, not from the page" and mark the object `dims_source`
+   estimated by passing `dimensions_m` without `dimensions_text`.
+5. "Would THIS fit where my X is?" → `roomsmith_check` `fits_at` with
+   `object_id` = X **and** `dimensions_m` of the new item (replacement test);
+   without `object_id` it will just overlap X and say no.
 
 Never fetch anything on the plugin's behalf other than the pages the user
 asked about.

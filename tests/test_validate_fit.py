@@ -115,3 +115,25 @@ def test_passes_door():
     s = scene_with()
     assert fitcheck.passes_door(s, [2.0, 0.85, 0.9])["passes"] is True  # 0.85 x 0.9 vs 0.9 x 2.03
     assert fitcheck.passes_door(s, [2.0, 1.0, 0.95])["passes"] is False
+
+
+def test_fits_at_with_object_id_and_dimensions_tests_a_replacement(tmp_path):
+    """Mini product run: 'would this (bigger) bed fit where my bed is?' passed object_id and
+    dimensions_m; the old code used the old bed's size and said yes; without object_id it
+    overlapped the old bed and said no. Replacement semantics make the answer honest."""
+    from rs_core.service import RoomService
+
+    s = RoomService(tmp_path / "data.db", tmp_path)
+    pid = s.create_project("B", width_m=2.82, depth_m=4.0)["project_id"]
+    s.apply({"project_id": pid, "operations": [{"op": "add_object", "name": "Double bed", "category": "bed_double", "dimensions_m": [1.4, 0.5, 2.0], "place": {"against_wall": "right", "align": "center"}}]})
+    # the replacement bed, 1.70 wide: fits on the 2.82 m wall where the 1.40 m bed is (ignoring the old bed)
+    r = s.check(pid, question="fits_at", object_id="ob1", dimensions_m=[1.70, 0.8, 2.18], name="Queen")
+    assert r["ok"] and r["fits"] is True, r
+    assert r["replacing"]["id"] == "ob1" and r["tested_dimensions_m"] == [1.7, 0.8, 2.18]
+    assert r["placement"]  # placed at the old bed's spot by default
+    # without object_id the same box overlaps the existing bed and the result says what to do
+    r2 = s.check(pid, question="fits_at", dimensions_m=[1.70, 0.8, 2.18], place={"position_m": [2.12, 0, 1.5]})
+    assert r2["fits"] is False and "object_id='ob1'" in r2["hint"]
+    # too wide for the wall it stands on: fails even as a replacement
+    r3 = s.check(pid, question="fits_at", object_id="ob1", dimensions_m=[4.5, 0.8, 2.0])
+    assert r3["fits"] is False

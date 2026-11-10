@@ -140,9 +140,11 @@ the room facing that wall.
   which fallback it took and asks for the room's measurements.
 - HEIC photos are not read yet; export as JPEG/PNG first.
 - Rooms are polygons in the data model but the editor resizes rectangles only.
-- Furniture is boxes and cylinders, not 3D product models; product pages are
-  read by Hermes's own web tools, so a page without printed dimensions needs you
-  to type them.
+- Furniture is boxes and cylinders, not 3D product models. Product pages are
+  read by Hermes's own tools (a web-extraction backend if configured, else
+  `curl` from the terminal); many shops rate-limit or render with JavaScript,
+  so the reliable path is pasting the link together with the printed size —
+  the plugin parses the size and keeps the link on the stand-in.
 - Hermes Desktop: the full-page editor needs one app restart after enabling; the
   Desktop's own right-click menu owns right-click on the canvas (pan with ⇧-drag
   or the middle button).

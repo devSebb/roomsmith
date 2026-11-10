@@ -48,6 +48,13 @@ Built 2026-11-07, hackathon week.
   `next_step` tells the agent to review draft issues with the user, not fix them
   blindly. S1 chat smoke passed on the Mini; `--image` is rejected by the gateway
   CLI (S6 blocked there; path route works).
+- `roomsmith_check fits_at`: `object_id` + `dimensions_m` now tests a replacement
+  (new size where the old object stands, hugging the same wall, old object
+  ignored) and the result names what it replaces; an overlap without
+  `object_id` hints at the replacement form. From the Mini product run, where
+  the old semantics said a longer bed fits because it measured the old bed.
+  Skill/tool text: how to read a page without an extraction backend (curl),
+  never present remembered sizes as page data, pass `category` for beds.
 - Dimension parser: when a page gives W and L (Floyd beds: `67" W x 86" L`), L is
   the depth for beds, cribs, rugs, benches, bathtubs and mattresses, and the width
   across the front for everything else (sofas, tables). `add_product` passes the

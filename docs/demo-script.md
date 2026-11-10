@@ -21,14 +21,14 @@ text file to paste.
 | 2 | **The room is 2.82 by 4 metres.** | Room stretches to size; furniture keeps its size and stays on the walls; Draft badge disappears; Hermes: "calibrated… furniture sizes kept" | 15–25 |
 | 3 | **Move the bed to the window wall, centred, and put a 1.2 m desk where the bed was.** | Bed glides to the back wall, a desk appears on the right wall, both highlighted for a second; Hermes reports any issue the move caused | 25–40 |
 | 4 | *(mouse)* Drag the bedside table across the room into the doorway. Then type: **Does anything block the door now?** | The drag snaps and shows "Against wall"; Hermes answers from geometry: "the bedside table is in the door's 0.8 m clear zone" — it saw your manual edit | 40–52 |
-| 5 | **Would this sofa fit against the wall opposite the bed? https://floydhome.com/products/the-sofa-2-0** | Hermes reads the page, a **2.18 × 0.86 m** stand-in labelled with the product appears, answer with clearance in centimetres and whether it passes the door | 52–70 |
+| 5 | **Would this Floyd sofa fit against the wall opposite the bed? It's 86 by 34 by 32 inches. https://floydhome.com/products/the-sofa-2-0** | A **2.18 × 0.86 m** stand-in labelled with the product and link appears; answer with clearance in centimetres and whether it passes the door. *(The size is in the prompt on purpose: the Mini's Hermes has a search-only web backend and Floyd rate-limits curl, so page retrieval is not demo-safe.)* | 52–70 |
 | 6 | Press **⌘Z** twice in the pane (or type **undo the last two changes**). Click **Plan**. Click **Export → GLB**. | Sofa and the table move vanish in order; plan view with measurements; export toast | 70–82 |
 | 7 | *(title card)* **Roomsmith — a Hermes Agent plugin. Photo → editable 3D room. No extra accounts.** `hermes plugins install devSebb/roomsmith` | | 82–90 |
 
 ## Fallbacks during the dry run
 
 - Photo build gives a poor room → use the **futon room** (one photo, `fixtures/photos/room-01…`) instead, or lead with *"Make a 2.82 by 4 metre bedroom with a window on the back wall and a door on the front wall"* (typed-size route; everything after step 1 is identical).
-- Hermes cannot fetch floydhome.com from the Mini → say the size in the prompt: *"Would a sofa 86 by 34 by 32 inches fit…"* — the parser and the fit check are the same code path.
+- If you want to try live page reading anyway, do it in the dry run only; the recorded take uses the size-in-prompt form.
 - A turn goes wrong → say *"undo that"* on camera; the plugin's undo is part of the pitch.
 
 ## Dry-run checklist (with Sebb watching)

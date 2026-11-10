@@ -189,7 +189,8 @@ CHECK = {
     "description": (
         "Fit and clearance questions, answered by geometry (quote the numbers, do not estimate). question:\n"
         "- 'issues': all current issues in the room\n"
-        "- 'fits_at': does a box of dimensions_m fit at `place`, with how much to spare (or pass object_id to test an existing object elsewhere)\n"
+        "- 'fits_at': does a box of dimensions_m fit at `place`, with how much to spare. object_id alone = test an existing object elsewhere; "
+        "object_id + dimensions_m = test a REPLACEMENT (a new bed where the old bed is: the old one is ignored, place defaults to its spot)\n"
         "- 'where_fits': up to three spots along the walls where dimensions_m would fit, ranked by clearance\n"
         "- 'passes_door': would dimensions_m pass through the door(s) (conservative rule)\n"
         "- 'clearance': free distance around object_id on each side"
@@ -211,10 +212,11 @@ CHECK = {
 ADD_PRODUCT = {
     "name": "roomsmith_add_product",
     "description": (
-        "Add a real product as a true-size stand-in box. First read the product page with your own web tools and extract the title, the dimensions text "
-        "exactly as written (e.g. 'Width: 228 cm, Depth: 95 cm, Height: 83 cm' or '71\" W x 35\" D x 30\" H'), the price and a product image URL; "
-        "then call this. The plugin parses the dimensions in code and reports clearance and whether it passes the door. "
-        "If the page has no dimensions, ask the user and pass dimensions_m."
+        "Add a real product as a true-size stand-in box. First read the product page (web_extract/fetch/browser; if your only web tool is search-only, "
+        "fetch the HTML with curl in the terminal) and extract the title, the dimensions text exactly as written (e.g. 'Width: 228 cm, Depth: 95 cm, Height: 83 cm' "
+        "or '71\" W x 35\" D x 30\" H'), the price and a product image URL; then call this with dimensions_text (and category when obvious: a bed's 'L' is its length). "
+        "The plugin parses the dimensions in code and reports clearance and whether it passes the door. "
+        "If you cannot read the page, ask the user for the printed sizes and pass dimensions_m; never pass sizes from memory as dimensions_text."
     ),
     "parameters": {
         "type": "object",

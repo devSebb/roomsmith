@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from rs_core import dims as dims_mod
+from rs_core import geometry as g
 from rs_core import export_glb, fitcheck, layout, ops, summarize, validate
 from rs_core import model as m
 from rs_core.catalog import normalize_category
@@ -327,19 +328,34 @@ class RoomService:
         scene, rev = self.store.get_scene(pid)
         q = (question or "issues").lower()
         dims = None
+        replacing: dict | None = None
         if object_id:
             try:
                 obj = m.find_object(scene, object_id)
             except SceneError as e:
                 return {"ok": False, "error": e.to_dict()}
-            dims = list(obj["dimensions_m"])
-            name = obj["name"]
+            if dimensions_m is not None:
+                # "would THIS (new size) fit where ob1 is?": test the new size in ob1's spot, ignoring ob1
+                try:
+                    dims = ops._dims(dimensions_m)  # noqa: SLF001 (same package)
+                except SceneError as e:
+                    return {"ok": False, "error": e.to_dict()}
+                replacing = obj
+                if not place and q == "fits_at":
+                    place = _same_spot_as(scene, obj, dims)
+                name = name if name and name != "candidate" else f"replacement for {obj['name']}"
+            else:
+                dims = list(obj["dimensions_m"])
+                name = obj["name"]
         elif dimensions_m is not None:
             try:
                 dims = ops._dims(dimensions_m)  # noqa: SLF001 (same package)
             except SceneError as e:
                 return {"ok": False, "error": e.to_dict()}
         base = {"ok": True, "project_id": pid, "revision": rev, "question": q}
+        if replacing is not None:
+            base["replacing"] = {"id": replacing["id"], "name": replacing["name"], "dimensions_m": replacing["dimensions_m"]}
+            base["tested_dimensions_m"] = dims
         if q == "issues":
             issues = validate.issues(scene)
             return {**base, "issues": issues, "count": len([i for i in issues if i["code"] != "uncalibrated"]), "text": "\n".join(f"- {i['code']}: {i['message']}" for i in issues) or "No issues."}
@@ -348,7 +364,14 @@ class RoomService:
         if q == "fits_at":
             if not place:
                 return _err("missing_field", "fits_at needs a place instruction, e.g. {\"against_wall\": \"w2\", \"align\": \"center\"}")
-            return {**base, **fitcheck.fits_at(scene, dims, place, name, ignore_ids=[object_id] if object_id else None)}
+            out = {**base, **fitcheck.fits_at(scene, dims, place, name, ignore_ids=[object_id] if object_id else None)}
+            if not out.get("fits") and not object_id:
+                hit = [i for i in out.get("issues", []) if i["code"] == "overlap"]
+                if hit:
+                    other = next((x for x in hit[0]["ids"] if x.startswith("ob")), None)
+                    if other:
+                        out["hint"] = f"It overlaps {other}. If it is meant to REPLACE {other}, repeat with object_id='{other}' and the same dimensions_m."
+            return out
         if q == "where_fits":
             return {**base, **fitcheck.where_fits(scene, dims, name)}
         if q == "passes_door":
@@ -524,6 +547,25 @@ class RoomService:
         from rs_core import __version__
 
         return {"ok": True, "version": __version__, "schema_version": m.SCHEMA_VERSION, "store": self.store.stats(), "data_dir": str(self.data_dir)}
+
+
+def _same_spot_as(scene: dict, obj: dict, new_dims: list[float]) -> dict:
+    """Place instruction for 'where OBJ is' with a different size: against the same
+    wall (same gap, centred where the old one was along it) when the old object stands
+    against a wall; otherwise the same centre and heading."""
+    fp = m.footprint(obj)
+    best = None
+    for wall in scene["room"]["walls"]:
+        a, b = m.wall_segment(scene, wall)
+        d = g.polygon_segment_distance(fp, a, b)
+        if best is None or d < best[1]:
+            best = (wall, d, a, b)
+    if best is not None and best[1] <= 0.08:
+        wall, gap, a, b = best
+        along = g.dot(g.sub((float(obj["position_m"][0]), float(obj["position_m"][2])), a), m.wall_direction(scene, wall))
+        offset = max(0.0, min(m.wall_length(scene, wall) - float(new_dims[0]), along - float(new_dims[0]) / 2.0))
+        return {"against_wall": wall["id"], "align": "left", "offset_m": round(offset, 3), "gap_m": round(gap, 3)}
+    return {"position_m": list(obj["position_m"]), "yaw_deg": math.degrees(float(obj.get("yaw_rad", 0.0)))}
 
 
 def sniff_image(data: bytes) -> str | None:
