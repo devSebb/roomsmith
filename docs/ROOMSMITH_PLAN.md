@@ -40,6 +40,8 @@ Each side sees the other's edits within about a second. Hermes can also answer q
 
 ## 2. Hackathon requirements and how the plan meets them
 
+**Sources:** the announcement <https://x.com/NousResearch/status/2118094256438936062> (4 Nov 2026, 21:33 UTC; prizes $10k / $5k / $2.5k / $1.5k / $1k + five runners-up; accepted entries listed in the Hermes Marketplace), the [catalog submission guide](https://hermes-agent.nousresearch.com/docs/developer-guide/plugins/catalog-submission), the [entry form](https://form.typeform.com/to/FwJLvOln). Deadline **5 PM EST, 11 November 2026**.
+
 | Requirement (from the Nous Research post) | How we meet it |
 |---|---|
 | Open a pull request adding the plugin to the Hermes plugin catalog | One file, `plugin-catalog/roomsmith.yaml`, in `NousResearch/hermes-agent`, pinned to a full commit SHA of the public plugin repo (section 16) |
@@ -589,11 +591,11 @@ Each milestone has a goal, deliverables, and exit criteria that are yes-or-no. T
 |---|---|---|
 | S0 | Can the Mini be reached read-only, and what Hermes version and model does it run? | **Passed 7 Nov:** `jessica`, Hermes v0.21.5 (git, dirty tree), Python 3.14.7. Model (GPT astra) per Sebb, not yet read from config |
 | S1 | Does a skeleton plugin load in the approved isolated Mini test home (and in the MacBook v0.21.0 as lower bound)? | **Passed 7 Nov on 0.21.0 (MacBook, isolated home):** `hermes plugins doctor --ci` OK (9 tools, 1 hook); the dashboard tab and backend run inside the real `hermes dashboard`. **Mini 8 Nov:** pinned install at 0bf14fc + doctor passed in the test home (0.23.0+689); a chat turn is blocked until Sebb signs the test home into Codex |
-| S2 | Does `ctx.llm.complete_structured` accept an image through the plugin LLM door on the Mini's model (GPT astra, subscription)? This is a different door from chat and may use Hermes's vision-fallback routing | Pending (Mini test home). Code path implemented with a fallback ladder; tested with a fake `ctx.llm` |
-| S3 | Is a photo-read draft good enough to be worth editing? | In progress: one real photo (narrow room, French doors, futon) in `fixtures/photos/` with a reference draft; the pipeline builds a plausible room from it offline — door centred on the back wall, futon along the right wall, warnings for the futon clipping the door's clear zone (true in the photo). Model-read quality is measured on the Mini (S2); more photos widen the scorecard |
+| S2 | Does `ctx.llm.complete_structured` accept an image through the plugin LLM door on the Mini's model? | **Passed 8 Nov** on gpt-6-astra (Harvey, Mini test home): populated draft, no fallback rung. Details and scorecards in `docs/compat.md` S2/S3 |
+| S3 | Is a photo-read draft good enough to be worth editing? | **Yes, with calibration (9 Nov):** two real rooms scored against tape measurements — widths within 7 % and 1 %, depth off by +47 % / −22 % (wide-angle), contents and walls right → `room_size` calibration added; scorecard in `docs/compat.md` S3 |
 | S4 | Does a Desktop pane with bundled three.js load, pass the lint, and stay under 1 MB? | **Passed 8 Nov:** Hermes Desktop 0.21.0 (+37159) on the MacBook, launched fully isolated; Roomsmith discovered under Settings → Plugins, pane renders the WebGL room, `ctx.rest` works behind auth; 593 KB; the authoritative desktop-surface lint passed on the Mini. Full page verified after a cold relaunch (routes are registered at app start, not hot-reloaded). Live follow verified: a room created by the agent (photo pipeline) opens in the running editor within a second with a toast |
 | S5 | Does a tool write in chat reach the pane through the backend? | **Passed 7 Nov (dashboard) and 8 Nov (Desktop):** an agent-actor command appears in the editor within ~1–2 s (long-poll) with a toast and a flash |
-| S6 | How does a photo attached in chat reach a tool? | Pending on the Mini. Route B (`new_room` with `layout`) is implemented and tested as the path that needs nothing from the host |
+| S6 | How does a photo attached in chat reach a tool? | **Path route works** (Desktop and CLI: `~/…/photo.png` in the prompt); CLI `--image` attachment is rejected by the gateway route; Desktop attachment untested → the demo uses paths. `docs/compat.md` S6 |
 | S7 | Can we run `hermes plugins validate` without touching any live install? | **Passed 8 Nov** on the Mini test checkout (0.23.0+689) at 0bf14fc, run by Harvey through `run-isolated.py`: all 16 checks ✓. Note `validate` takes a directory; it also reports that on 0.23 the plugin runs in the plugin host and the dashboard API is proxied with buffered responses |
 
 **Exit:** a filled-in results table. Any failed spike has its fallback chosen (section 19) before M1 starts.
@@ -717,7 +719,9 @@ Deferred from the v2 brief on purpose: the MacBook-to-Mini remote setup, payment
 
 ---
 
-## 21. Decisions needed from Sebb
+## 21. Decisions needed from Sebb — all taken (7–9 Nov)
+
+Kept for the record; every item below was decided: M0 went ahead (7 Nov); SSH key added by Sebb/Harvey; isolated test home at `/Users/jessica/room-studio-test/` (Harvey); four photos of two rooms supplied (gitignored); repo `devSebb/roomsmith`, MIT, public; Harvey does the reinstall + doctor + backend restart on request; Sebb records and posts, demo via the Desktop on the MacBook connected to the Mini test backend (tunnel + Remote gateway).
 
 1. **Go to start M0.** Model calls run on the Mini's subscription (GPT astra), so cost is not a factor there; the handful of MacBook-side calls, if any, go through the local OpenRouter key and are small.
 2. **SSH to the Mini.** This MacBook's public key (`~/.ssh/id_ed25519.pub`) must be added to `/Users/jessica/.ssh/authorized_keys` on the Mini by Sebb or Harvey. I will not change SSH config or keys myself.

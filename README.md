@@ -7,7 +7,7 @@ the editor or by talking to Hermes — both edit the same room, with undo. Paste
 product link and it appears at its true size, so you can see whether it fits
 before you buy.
 
-**Status: 0.1.0, in development for the Hermes Agent Plugin Hackathon.**
+**Status: 0.1.0 — built for the [Hermes Agent Plugin Hackathon](https://x.com/NousResearch/status/2118094256438936062) (Nous Research, 4–11 November 2026); see [Hackathon](#hackathon) below.**
 
 ![The Roomsmith page in Hermes Desktop: a room built from a photo — French doors on the back wall, a futon along the right wall, warnings on the objects that clip the door's clear zone](docs/screenshots/desktop-page.png)
 
@@ -21,7 +21,7 @@ before you buy.
   guesses, and the furniture it sees as sized boxes. Sizes are estimates until
   you give one real measurement (a wall, the door); then the whole room rescales.
 - **One room, two editors.** A live 3D editor (Hermes Desktop pane, or a tab in
-  `hermes dashboard`) and nine agent tools write the same saved room. Every edit
+  `hermes dashboard`) and ten agent tools write the same saved room. Every edit
   is a numbered revision with undo; Hermes sees what you changed by hand, and
   you see what Hermes changed (it glides into place with a note), and when
   Hermes creates or opens another room the editor follows.
@@ -41,7 +41,7 @@ before you buy.
 ```bash
 hermes plugins install devSebb/roomsmith      # GitHub shorthand or the catalog name
 hermes plugins enable roomsmith               # if it installed disabled
-hermes plugins doctor roomsmith --ci          # optional: 9 tools, 1 hook, OK
+hermes plugins doctor roomsmith --ci          # optional: 10 tools, 1 hook, OK
 ```
 
 Then, depending on where you talk to Hermes:
@@ -66,7 +66,7 @@ plugin says so and builds the room from the sizes you give it instead.
 > make a 4.2 by 5 metre living room with a door on the left wall
 > add a 2.1 m sofa against the back wall and a coffee table in front of it
 > would a 1.6 m wide bookshelf fit on the right wall?
-> https://www.example-shop.com/kivik-sofa — does this fit where the sofa is?
+> would this fit where the sofa is? https://www.castlery.com/us/products/hamilton-sofa
 > /room
 ```
 
@@ -80,16 +80,17 @@ the room itself) or say `make a room from ~/Pictures/living.jpg`. Then:
 ## How it is built
 
 ```
-plugin.yaml, __init__.py   agent half: 9 tools, /room, skill, awareness hook
+plugin.yaml, __init__.py   agent half: 10 tools, /room, skill, awareness hook
 rs_core/                   the engine: scene model, operations, validation,
-                           fit checks, SQLite store. Standard library only.
+                           fit checks, product-page reading, SQLite store.
+                           Standard library; Pillow (if present) for thumbnails.
 rs_agent/                  Hermes-facing layer (tool schemas, handlers, photo)
 dashboard/plugin_api.py    FastAPI routes under /api/plugins/roomsmith/
 dashboard/dist/index.js    the editor as a dashboard tab (built)
 desktop/plugin.js          the editor as a Hermes Desktop plugin (built)
 web/                       editor source (TypeScript, three.js, React) + build
 skills/room-design/        how the agent should work with a room
-tests/                     pytest (engine, tools, backend) — 81 tests
+tests/                     pytest (engine, tools, backend, product pages) — 111 tests
 docs/                      plan, compatibility record, screenshots
 ```
 
@@ -154,6 +155,14 @@ the room facing that wall.
 - Hermes Desktop: the full-page editor needs one app restart after enabling; the
   Desktop's own right-click menu owns right-click on the canvas (pan with ⇧-drag
   or the middle button).
+
+## Hackathon
+
+Entry for the **Hermes Agent Plugin Hackathon** run by Nous Research:
+
+- Announcement: <https://x.com/NousResearch/status/2118094256438936062> (4 Nov 2026) — 7 days, deadline **Wed 11 Nov 2026, 5 PM EST**; judged on usefulness, reliability, polish and creativity, favouring plugins that do more than a prompt or a skill could.
+- Entry = a pull request adding `plugin-catalog/roomsmith.yaml` to [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) ([submission guide](https://hermes-agent.nousresearch.com/docs/developer-guide/plugins/catalog-submission)) + a demo video under 90 s posted on X tagging @NousResearch + both links through the [entry form](https://form.typeform.com/to/FwJLvOln).
+- Our catalog entry draft: [`catalog/roomsmith.yaml`](catalog/roomsmith.yaml) (pinned with `scripts/pin-catalog.py`); demo script: [`docs/demo-script.md`](docs/demo-script.md); plan and milestones: [`docs/ROOMSMITH_PLAN.md`](docs/ROOMSMITH_PLAN.md); what was verified where: [`docs/compat.md`](docs/compat.md).
 
 ## Licence
 
