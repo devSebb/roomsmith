@@ -124,3 +124,11 @@ Built 2026-11-07, hackathon week.
   name tag at once; the selected or hovered object keeps its tag so you never lose
   what you are pointing at. Asked for by Sebb during the Desktop dry run — the old
   "Aa" button did this but nobody found it.
+- 2026-11-10 (evening): the editor's **GLB** button exports what the editor shows —
+  furniture shapes, plank floor, skirting, openings, product tags, walls made solid
+  — via three's GLTFExporter in the browser, instead of the engine's box-per-object
+  file (Sebb opened one in Quick Look: a ceiling fan as a floating black box). The
+  engine export (`roomsmith_export` tool, dashboard URL) is unchanged and stays
+  the box version; the editor falls back to it if the browser export fails.
+  Verified by reloading the file with GLTFLoader: 97 nodes, 275 KB for the
+  15-object showroom, ~4 s to produce.

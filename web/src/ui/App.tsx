@@ -132,7 +132,7 @@ export function App(props: AppProps) {
         <div className="rs-body">
           {!scene && <div className="rs-muted">Open or create a room to start.</div>}
           {scene && tab === 'objects' && (selected ? <ObjectInspector store={store} scene={scene} o={selected} openExternal={props.openExternal} /> : <ObjectList store={store} scene={scene} issues={s.issues} onFocus={id => ed?.focus(id)} />)}
-          {scene && tab === 'room' && <RoomPanel store={store} scene={scene} opening={selectedOpening} wallId={s.selectedWallId} api={props.api} openExternal={props.openExternal} />}
+          {scene && tab === 'room' && <RoomPanel store={store} scene={scene} opening={selectedOpening} wallId={s.selectedWallId} api={props.api} openExternal={props.openExternal} editor={ed} />}
           {scene && tab === 'issues' && <IssuesPanel issues={s.issues} scene={scene} onPick={id => { store.select(id); ed?.focus(id); setTab('objects') }} />}
           {scene && tab === 'history' && <HistoryPanel store={store} s={s} />}
           {scene && tab === 'add' && <AddPanel store={store} scene={scene} />}
@@ -297,7 +297,7 @@ function nearestWall(scene: Scene, o: SceneObject): string {
   return best
 }
 
-function RoomPanel({ store, scene, opening, wallId, api, openExternal }: { store: Store; scene: Scene; opening: Opening | null; wallId: string | null; api: Api; openExternal?: (u: string) => void }) {
+function RoomPanel({ store, scene, opening, wallId, api, openExternal, editor }: { store: Store; scene: Scene; opening: Opening | null; wallId: string | null; api: Api; openExternal?: (u: string) => void; editor?: Editor | null }) {
   const isRect = scene.room.vertices.length === 4
   const xs = scene.room.vertices.map(v => v.x), zs = scene.room.vertices.map(v => v.z)
   const W = Math.max(...xs) - Math.min(...xs), D = Math.max(...zs) - Math.min(...zs)
@@ -360,6 +360,17 @@ function RoomPanel({ store, scene, opening, wallId, api, openExternal }: { store
           <a key={f} className="rs-btn sm" href={api.exportUrl(scene.project.id, f)} download onClick={async e => {
             e.preventDefault()
             const safe = scene.project.name.replace(/[^\w-]+/g, '_')
+            if (f === 'glb' && editor) {
+              // export what the editor shows (shapes, floor, walls, product tags), not the engine's boxes
+              try {
+                const buf = await editor.exportGLB()
+                const url = URL.createObjectURL(new Blob([buf], { type: 'model/gltf-binary' }))
+                const a = document.createElement('a'); a.href = url; a.download = `${safe}.glb`; document.body.appendChild(a); a.click(); a.remove()
+                setTimeout(() => URL.revokeObjectURL(url), 10000)
+                store.toast('info', `Exported ${safe}.glb (${(buf.byteLength / 1024).toFixed(0)} KB)`)
+                return
+              } catch (err) { console.warn('[roomsmith] editor GLB export failed, using the engine export', err) }
+            }
             if (await api.download(scene.project.id, f, safe)) return
             if (openExternal) openExternal(api.exportUrl(scene.project.id, f))
             else window.open(api.exportUrl(scene.project.id, f), '_blank')

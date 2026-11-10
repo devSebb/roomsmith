@@ -34,7 +34,9 @@ before you buy.
   against that wall, with how much to spare", "where could it fit", "will it
   pass through the door".
 - **Export** to GLB (opens in Blender, macOS Quick Look, most 3D tools), JSON
-  (re-importable), or a text summary with sizes and product links.
+  (re-importable), or a text summary with sizes and product links. The editor's
+  GLB is the room as drawn (shapes, floor, product tags); the agent's
+  `roomsmith_export` writes a lighter box-per-object GLB.
 
 ## Install
 

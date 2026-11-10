@@ -2,6 +2,7 @@
 
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import type { Issue, Scene, SceneObject } from '../types'
 import { normalizeYaw, overlapsAny, snapObject, type P } from './math'
 import { ObjectView, buildRoom, disposeGroup, type RoomViews, type Theme } from './three-scene'
@@ -260,6 +261,27 @@ export class Editor {
 
   /** Show or hide every object's name tag. Hidden mode still tags the selected and
    *  hovered object, so "hide all" never loses what you are pointing at. */
+  /** The room as shown — furniture shapes, floor, walls, product tags — as a binary glTF.
+   *  Pick boxes (opacity 0), labels, outlines and the ground grid are left out. */
+  exportGLB(): Promise<ArrayBuffer> {
+    const root = new THREE.Group()
+    root.name = 'Roomsmith'
+    this.scene3.updateMatrixWorld(true)
+    this.scene3.traverse(o => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh || !o.visible) return
+      let mat = m.material as THREE.Material & { opacity?: number }
+      if (!mat || mat.opacity === 0) return
+      if (o.userData.wallId && (mat.opacity ?? 1) < 1) { mat = mat.clone(); mat.opacity = 1; mat.transparent = false } // walls faded for the camera export solid
+      const c = new THREE.Mesh(m.geometry, mat)
+      c.name = (o.parent?.userData?.objectId as string) || o.name || ''
+      c.matrixAutoUpdate = false
+      c.matrix.copy(m.matrixWorld)
+      root.add(c)
+    })
+    return new Promise((res, rej) => new GLTFExporter().parse(root, r => res(r as ArrayBuffer), rej, { binary: true }))
+  }
+
   setLabels(on: boolean) {
     this.showLabels = on
     for (const id of this.objects.keys()) this.syncLabel(id)
