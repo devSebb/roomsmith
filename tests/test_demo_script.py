@@ -96,7 +96,7 @@ def test_demo_script_end_to_end(demo):
     door = next(o for o in call("roomsmith_inspect")["room"]["openings"] if o["kind"] == "door")
     plant_w = after["Floor plant"]["dimensions_m"][0]
     in_doorway = {"against_wall": door["wall_id"], "align": "left", "offset_m": door["offset_m"] + door["width_m"] / 2 - plant_w / 2, "gap_m": 0.1}
-    manual = svc.apply({"project_id": pid, "actor": "user", "operations": [{"op": "move_object", "id": objs["Floor plant"], "place": in_doorway}]})
+    manual = svc.apply({"project_id": pid, "actor": "user", "operations": [{"op": "move_object", "id": objs["Floor plant"], "place": in_doorway, "allow_overlap": True}]})  # a drag lands where the hand puts it
     assert manual["ok"], manual
     r = call("roomsmith_check", question="issues")
     assert r["ok"]

@@ -152,3 +152,22 @@ def test_footprint_only_takes_the_usual_height_for_the_category():
     # without a category there is nothing to assume: no dimensions, honest note
     r2 = pf.fetch_product("https://desks.example.com/tria", _get=fake_get({"tria": DESK_PAGE}))
     assert r2["dimensions_m"] is None
+
+
+def test_product_color_is_the_photo_s_dominant_colour():
+    import base64
+    import io
+
+    import pytest
+
+    PIL = pytest.importorskip("PIL.Image")
+    from rs_core.service import product_color
+
+    im = PIL.new("RGB", (40, 40), (255, 255, 255))  # studio white
+    for x in range(8, 32):
+        for y in range(14, 34):
+            im.putpixel((x, y), (193, 189, 180))  # a cream sofa
+    buf = io.BytesIO(); im.save(buf, format="PNG")
+    url = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    assert product_color(url) == "#c1bdb4"
+    assert product_color("data:image/png;base64,AAAA") is None

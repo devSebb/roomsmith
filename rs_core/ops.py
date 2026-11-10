@@ -364,7 +364,7 @@ SEMANTIC_PLACE = ("against_wall", "next_to", "in_corner", "centered_in_room")
 
 def _clear(scene: dict, obj: dict, op: dict, place: dict, details: dict) -> str:
     """After a described placement (against a wall, next to…), slide the piece to the
-    nearest clear floor spot and say so. Exact coordinates (editor drags, `position_m`,
+    nearest spot clear of other floor pieces and of doorways, and say so. Exact coordinates (editor drags, `position_m`,
     `by`), surface/wall/ceiling mounts and `allow_overlap: true` are left alone."""
     from rs_core.layout import clear_overlap
 

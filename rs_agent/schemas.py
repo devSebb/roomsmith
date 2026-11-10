@@ -134,7 +134,7 @@ APPLY = {
         "- update_opening {id, ...same fields} | remove_opening {id}\n"
         "- calibrate {reference: {kind: 'room_size', width_m, depth_m}} fits the room to its real floor size (each axis separately — photos stretch depth more than width), keeps furniture sizes, keeps things against their walls. PREFER this when the user knows the room's size. "
         "Or {reference: {kind: 'wall_length'|'room_height'|'opening_width', id, real_m}} (room + positions; furniture sizes kept) or {kind: 'object_width'|'object_height'|'object_depth', id, real_m} (scales everything estimated).\n"
-        "Placing or moving a floor piece with against_wall/next_to/in_corner/centered_in_room slides it to the nearest clear spot if it would land inside another piece "
+        "Placing or moving a floor piece with against_wall/next_to/in_corner/centered_in_room slides it to the nearest clear spot if it would land inside another piece or in a doorway's clear zone "
         "(the receipt says 'slid 0.62 m along the wall to clear X'); exact position_m is honoured as given; allow_overlap: true keeps the described spot. "
         "Things sitting on a piece (mount 'surface') move with it.\n"
         "Returns what changed, the new revision, and any issues the change caused (overlap, outside_room, blocks_door, blocks_window, tight_walkway, too_tall)."

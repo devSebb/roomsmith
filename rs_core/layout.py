@@ -370,8 +370,19 @@ def overlapping(scene: dict, obj: dict) -> list[dict]:
     return [o for o in scene["objects"] if o is not obj and o["id"] != obj["id"] and _blocks_floor(o) and g.convex_overlap_depth(fp, m.footprint(o)) > 0.01]
 
 
+def doors_blocked(scene: dict, obj: dict) -> list[dict]:
+    """Doors whose clear zone `obj` stands in (same rule as the blocks_door issue)."""
+    from rs_core.validate import door_zones
+
+    if not _blocks_floor(obj):
+        return []
+    fp = m.footprint(obj)
+    return [o for o, zone in door_zones(scene) if g.convex_overlap_depth(fp, zone) > 0.01]
+
+
 def clear_overlap(scene: dict, obj: dict, step: float = 0.05, max_m: float = 6.0) -> dict | None:
-    """Slide `obj` to the nearest spot where it overlaps nothing on the floor.
+    """Slide `obj` to the nearest spot where it overlaps nothing on the floor and
+    stands in no doorway's clear zone.
 
     Tries along its own right axis first (along the wall it sits against), then
     forward/back, then the nearest point of a small grid. Returns a receipt
@@ -379,9 +390,10 @@ def clear_overlap(scene: dict, obj: dict, step: float = 0.05, max_m: float = 6.0
     sits clear. Leaves the object where it was and returns ``{"moved_m": 0, ...,
     "failed": True}`` when nothing within `max_m` is free."""
     hits = overlapping(scene, obj)
-    if not hits:
+    doors = doors_blocked(scene, obj)
+    if not hits and not doors:
         return None
-    names = [o["name"] for o in hits]
+    names = [o["name"] for o in hits] + [f"the {d['kind']} {d['id']}" for d in doors]
     x0, z0 = float(obj["position_m"][0]), float(obj["position_m"][2])
     bx0, bz0, bx1, bz1 = m.room_bounds(scene)
     r = g.right_vector(float(obj.get("yaw_rad", 0.0)))
@@ -392,7 +404,7 @@ def clear_overlap(scene: dict, obj: dict, step: float = 0.05, max_m: float = 6.0
         fx0, fz0, fx1, fz1 = g.bounds(m.footprint(obj))
         if fx0 < bx0 - 1e-6 or fz0 < bz0 - 1e-6 or fx1 > bx1 + 1e-6 or fz1 > bz1 + 1e-6:
             return False
-        return not overlapping(scene, obj)
+        return not overlapping(scene, obj) and not doors_blocked(scene, obj)
 
     # Sliding along the wall keeps the piece against it, so it wins unless it is
     # much longer than moving off the wall (x2) or across the room (x3).
@@ -402,14 +414,16 @@ def clear_overlap(scene: dict, obj: dict, step: float = 0.05, max_m: float = 6.0
         d = k * step
         for sgn in (1.0, -1.0):
             candidates.append((d, x0 + sgn * r[0] * d, z0 + sgn * r[1] * d, "along the wall"))
-            candidates.append((2 * d, x0 + sgn * f[0] * d, z0 + sgn * f[1] * d, "forward"))
-    coarse = int(max_m / 0.2)
-    for i in range(-coarse, coarse + 1):
-        for j in range(-coarse, coarse + 1):
-            dx, dz = i * 0.2, j * 0.2
-            if dx == 0 and dz == 0:
-                continue
-            candidates.append((3 * math.hypot(dx, dz), x0 + dx, z0 + dz, "across the room"))
+            if not doors:  # stepping off the wall clears a piece, never a doorway (that is just "in the way, further out")
+                candidates.append((2 * d, x0 + sgn * f[0] * d, z0 + sgn * f[1] * d, "forward"))
+    if not doors:
+        coarse = int(max_m / 0.2)
+        for i in range(-coarse, coarse + 1):
+            for j in range(-coarse, coarse + 1):
+                dx, dz = i * 0.2, j * 0.2
+                if dx == 0 and dz == 0:
+                    continue
+                candidates.append((3 * math.hypot(dx, dz), x0 + dx, z0 + dz, "across the room"))
     candidates.sort(key=lambda c: c[0])
     for d, x, z, how in candidates:
         if free_at(x, z):

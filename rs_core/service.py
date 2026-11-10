@@ -426,6 +426,8 @@ class RoomService:
         thumb = self.product_thumbnail(image_url) if image_url else None
         if thumb:
             product["image_data"] = thumb
+            if not color:
+                color = product_color(thumb)  # the stand-in wears the product's colour, not a category default
         op: dict = {
             "op": "add_object",
             "name": title[:60],
@@ -618,6 +620,29 @@ class RoomService:
         from rs_core import __version__
 
         return {"ok": True, "version": __version__, "schema_version": m.SCHEMA_VERSION, "store": self.store.stats(), "data_dir": str(self.data_dir)}
+
+
+def product_color(data_url: str) -> str | None:
+    """Dominant colour of a product photo as #rrggbb: the median of its non-background
+    pixels (white/near-white studio backgrounds and transparent areas ignored).
+    None without Pillow or when the photo is all background."""
+    try:
+        import base64
+        import io
+
+        from PIL import Image
+
+        raw = base64.b64decode(data_url.split(",", 1)[1])
+        im = Image.open(io.BytesIO(raw)).convert("RGB")
+        im.thumbnail((48, 48))
+        px = [p for p in im.getdata() if max(p) < 235 or (max(p) - min(p)) > 25]
+        if len(px) < 20:
+            return None
+        chans = [sorted(c[i] for c in px) for i in range(3)]
+        med = [chans[i][len(px) // 2] for i in range(3)]
+        return "#%02x%02x%02x" % tuple(med)
+    except Exception:  # noqa: BLE001 - a colour is a nicety
+        return None
 
 
 def _same_spot_as(scene: dict, obj: dict, new_dims: list[float]) -> dict:

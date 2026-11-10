@@ -72,8 +72,8 @@ export class ObjectView {
     this.group.userData.objectId = obj.id
     this.snapTo(obj)
   }
-  /** The product's photo on the stand-in: on every vertical face (so it reads from any
-   *  camera angle), or on top for flat things (rugs). */
+  /** The product's photo on the stand-in, as a hang-tag on its front and back faces
+   *  (the stand-in itself wears the photo's colour), or on top for flat things (rugs). */
   private addProductCard(dataUrl: string, w: number, h: number, d: number) {
     const flat = h < 0.15
     const faces: { faceW: number; faceH: number; pos: [number, number, number]; rotY: number; rotX: number }[] = flat
@@ -81,8 +81,6 @@ export class ObjectView {
       : [
           { faceW: w, faceH: h, pos: [0, h / 2, -d / 2 - 0.004], rotY: Math.PI, rotX: 0 }, // front (-Z), faces outward
           { faceW: w, faceH: h, pos: [0, h / 2, d / 2 + 0.004], rotY: 0, rotX: 0 }, // back (+Z)
-          { faceW: d, faceH: h, pos: [-w / 2 - 0.004, h / 2, 0], rotY: -Math.PI / 2, rotX: 0 }, // left (-X)
-          { faceW: d, faceH: h, pos: [w / 2 + 0.004, h / 2, 0], rotY: Math.PI / 2, rotX: 0 }, // right (+X)
         ]
     const planes = faces.map(f => {
       const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.98, depthWrite: false }))
@@ -101,8 +99,9 @@ export class ObjectView {
       t.needsUpdate = true
       const ar = img.width / img.height
       faces.forEach((f, i) => {
-        let pw = f.faceW * 0.96, ph = pw / ar
-        if (ph > f.faceH * 0.94) { ph = f.faceH * 0.94; pw = ph * ar }
+        const fill = flat ? 0.96 : 0.62 // a tag, not a wrap
+        let pw = f.faceW * fill, ph = pw / ar
+        if (ph > f.faceH * fill) { ph = f.faceH * fill; pw = ph * ar }
         const plane = planes[i]
         ;(plane.material as THREE.MeshBasicMaterial).map = t
         ;(plane.material as THREE.MeshBasicMaterial).needsUpdate = true

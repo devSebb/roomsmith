@@ -182,7 +182,7 @@ def test_calibrate_room_size_scales_axes_independently_and_keeps_wall_contact():
     s["room"]["openings"].append(m.make_opening(s, "w1", "door", 0.63, 1.55, 2.1, 0.0, dims_source="estimated"))
     r = apply(
         s,
-        {"op": "add_object", "name": "Sofa", "category": "sofa", "dimensions_m": [2.0, 0.82, 0.88], "place": {"against_wall": "right", "align": "center"}},
+        {"op": "add_object", "name": "Sofa", "category": "sofa", "dimensions_m": [2.0, 0.82, 0.88], "place": {"against_wall": "right", "align": "center"}, "allow_overlap": True},  # as the photo had it, door swing or not
         {"op": "add_object", "name": "Table", "category": "table_side", "dimensions_m": [0.4, 0.58, 0.36], "place": {"position_m": [1.3, 0, 2.2]}},
     )
     for o in r.scene["objects"]:
@@ -344,3 +344,27 @@ def test_riders_follow_their_host():
     r4 = apply(r3.scene, {"op": "remove_object", "id": "ob1"})
     (bk,) = r4.scene["objects"]
     assert bk["mount"] == "floor" and bk["position_m"][1] == 0.0 and "now on the floor" in r4.results[0].summary
+
+
+def test_described_placement_slides_out_of_the_doorway():
+    """'Against the wall opposite the bed' with a door in that wall: the sofa lands
+    beside the door, not in front of it."""
+    s = scene()  # 4 x 5; door near one end of the front wall (w3)
+    r = apply(
+        s,
+        {"op": "add_opening", "wall": "w3", "kind": "door", "width_m": 0.9, "position_fraction": 0.2},
+        {"op": "add_object", "name": "Sofa", "category": "sofa", "dimensions_m": [2.25, 0.82, 1.0], "place": {"against_wall": "w3", "align": "center"}},
+    )
+    sofa = r.scene["objects"][0]
+    assert not any(i["code"] == "blocks_door" for i in validate.issues(r.scene))
+    assert abs(sofa["position_m"][2] - (5.0 - 0.52)) < 1e-6  # still against the front wall
+    res = r.results[1]
+    assert "slid" in res.summary and "door" in res.summary and 0.3 < res.details["adjusted_m"] < 1.0
+    # door in the middle of a wall too short to take the sofa beside it: it is NOT pushed
+    # out into the room; the receipt says there is no clear spot on that wall
+    r2 = apply(
+        scene(),
+        {"op": "add_opening", "wall": "w3", "kind": "door", "width_m": 0.9, "position_fraction": 0.5},
+        {"op": "add_object", "name": "Sofa", "category": "sofa", "dimensions_m": [2.25, 0.82, 1.0], "place": {"against_wall": "w3", "align": "center"}},
+    )
+    assert "no clear spot" in r2.results[1].summary and abs(r2.scene["objects"][0]["position_m"][2] - (5.0 - 0.52)) < 1e-6
