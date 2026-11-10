@@ -72,28 +72,44 @@ export class ObjectView {
     this.group.userData.objectId = obj.id
     this.snapTo(obj)
   }
-  /** The product's photo on the stand-in: on the front face, or on top for flat things (rugs). */
+  /** The product's photo on the stand-in: on every vertical face (so it reads from any
+   *  camera angle), or on top for flat things (rugs). */
   private addProductCard(dataUrl: string, w: number, h: number, d: number) {
-    const tex = new THREE.TextureLoader().load(dataUrl, t => {
+    const flat = h < 0.15
+    const faces: { faceW: number; faceH: number; pos: [number, number, number]; rotY: number; rotX: number }[] = flat
+      ? [{ faceW: w, faceH: d, pos: [0, h + 0.003, 0], rotY: 0, rotX: -Math.PI / 2 }]
+      : [
+          { faceW: w, faceH: h, pos: [0, h / 2, -d / 2 - 0.004], rotY: Math.PI, rotX: 0 }, // front (-Z), faces outward
+          { faceW: w, faceH: h, pos: [0, h / 2, d / 2 + 0.004], rotY: 0, rotX: 0 }, // back (+Z)
+          { faceW: d, faceH: h, pos: [-w / 2 - 0.004, h / 2, 0], rotY: -Math.PI / 2, rotX: 0 }, // left (-X)
+          { faceW: d, faceH: h, pos: [w / 2 + 0.004, h / 2, 0], rotY: Math.PI / 2, rotX: 0 }, // right (+X)
+        ]
+    const planes = faces.map(f => {
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.98, depthWrite: false }))
+      plane.userData.objectId = this.obj.id
+      plane.position.set(...f.pos)
+      plane.rotation.set(f.rotX, f.rotY, 0)
+      plane.renderOrder = 2
+      plane.visible = false
+      this.group.add(plane)
+      return plane
+    })
+    new THREE.TextureLoader().load(dataUrl, t => {
       const img = t.image as { width: number; height: number }
       if (!img?.width || !img?.height) return
-      const flat = h < 0.15
-      const faceW = flat ? w : w, faceH = flat ? d : h
-      const ar = img.width / img.height
-      let pw = faceW * 0.96, ph = pw / ar
-      if (ph > faceH * 0.94) { ph = faceH * 0.94; pw = ph * ar }
-      plane.scale.set(pw, ph, 1)
       t.colorSpace = THREE.SRGBColorSpace
       t.needsUpdate = true
+      const ar = img.width / img.height
+      faces.forEach((f, i) => {
+        let pw = f.faceW * 0.96, ph = pw / ar
+        if (ph > f.faceH * 0.94) { ph = f.faceH * 0.94; pw = ph * ar }
+        const plane = planes[i]
+        ;(plane.material as THREE.MeshBasicMaterial).map = t
+        ;(plane.material as THREE.MeshBasicMaterial).needsUpdate = true
+        plane.scale.set(pw, ph, 1)
+        plane.visible = true
+      })
     })
-    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.98, depthWrite: false })
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat)
-    plane.userData.objectId = this.obj.id
-    if (h < 0.15) { plane.rotation.x = -Math.PI / 2; plane.position.set(0, h + 0.003, 0) } // flat: lie on top
-    else plane.position.set(0, h / 2, -d / 2 - 0.004) // front face is -Z
-    if (h >= 0.15) plane.rotation.y = Math.PI // face outward from -Z
-    plane.renderOrder = 2
-    this.group.add(plane)
   }
   setLabel(theme: Theme) {
     if (this.label) this.group.remove(this.label)
