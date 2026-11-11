@@ -504,7 +504,8 @@ def find_dimensions(texts: list[str], category: str | None = None) -> dict | Non
 
         spec = spec_for(category)
         partial_fallback["height_m"] = round(float(spec.default[1]), 4)
-        partial_fallback["height_assumed"] = True
+        if category != "rug":  # a rug is sold by width and length; its thickness is not a size anyone needs to check
+            partial_fallback["height_assumed"] = True
         partial_fallback.pop("partial", None)
         return partial_fallback
     return None

@@ -13,6 +13,7 @@ furniture convention) and flagged ``assumed_order``.
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any
 
@@ -77,6 +78,7 @@ _FT_IN = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:ft|feet|foot|'|’)\s*(\d+(?:[.,]\d
 # labels may be glued to their number ("W88.6\"", "180cmW"): bound them by non-letters, not \b
 _PART_OF_IT = re.compile(r"\b(seat|arm|armrest|leg|legs|back|backrest|shelf|drawer|interior|inside|inner|cushion|mattress|clearance|package|packaging|box|carton|table ?top|top|base|shade|cord|cable)\s*[:\-]?\s*$")
 _NOT_ITS_SIZE = re.compile(r"(fits? through|door(way)?s?|clearance|from (the )?(floor|ground)|floor to|box size|package size|shipping)\b[^.;\n]{0,24}$")
+_FT_AND_IN = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:ft\b|feet\b|foot\b|'|’)\s*(\d+(?:[.,]\d+)?)\s*(?:in\b|inch(?:es)?\b|\"|”)", re.I)
 _LABEL_FIRST = re.compile(rf"(?<![A-Za-z])({_LABEL})(?![A-Za-z])\s*[:=]?\s*({_NUM})\s*({_UNIT})?", re.I)
 _VALUE_FIRST = re.compile(rf"({_NUM})\s*({_UNIT})?\s*(?<![A-Za-z])({_LABEL})(?![A-Za-z])", re.I)
 _TRIPLE = re.compile(rf"({_NUM})\s*({_UNIT})?\s*(?:x|×|\*|by)\s*({_NUM})\s*({_UNIT})?\s*(?:x|×|\*|by)\s*({_NUM})\s*({_UNIT})?", re.I)
@@ -183,9 +185,31 @@ def plausible(parsed: dict[str, Any] | None, category: str | None) -> bool:
     return True
 
 
+def _inches_if_that_fits_better(parsed: dict[str, Any] | None, category: str | None) -> dict[str, Any] | None:
+    """Three bare numbers ("80 x 34 x 33") were read as centimetres. When the category is
+    known and the same numbers as inches sit much closer to its usual size, they are inches."""
+    if not parsed or parsed.get("guessed_unit") != "cm" or not category or parsed.get("partial"):
+        return parsed
+    from rs_core.catalog import CATALOG
+
+    spec = CATALOG.get(category)
+    if spec is None or category in ("box", "other"):
+        return parsed
+    keys = ("width_m", "height_m", "depth_m")
+
+    def distance(scale: float) -> float:
+        return sum(abs(math.log(parsed[k] * scale / usual)) for k, usual in zip(keys, spec.default) if parsed[k] > 0 and usual > 0)
+
+    if distance(2.54) + 0.5 < distance(1.0):
+        parsed = {**parsed, **{k: parsed[k] * 2.54 for k in keys}, "guessed_unit": "in"}
+        parsed["order_note"] = (parsed.get("order_note") + " " if parsed.get("order_note") else "") + "No unit was printed: read as inches, which fits this kind of piece."
+    return parsed
+
+
 def parse_dimensions(text: str | None, default_unit: str | None = None, category: str | None = None) -> dict[str, Any] | None:
     """Read printed dimensions and turn them to Roomsmith's width/height/depth."""
-    return orient_for_category(_parse_dimensions(unfraction(text) if text else text, default_unit, category), category)
+    parsed = _parse_dimensions(unfraction(text) if text else text, default_unit, category)
+    return orient_for_category(_inches_if_that_fits_better(parsed, category), category)
 
 
 def _parse_dimensions(text: str | None, default_unit: str | None = None, category: str | None = None) -> dict[str, Any] | None:
@@ -195,6 +219,10 @@ def _parse_dimensions(text: str | None, default_unit: str | None = None, categor
     raw = text.strip()
     s = raw.replace("×", "x").replace("＊", "*")
     s = re.sub(r"(\d)\s*(?:''|’’|″|\u201d)", r'\1"', s)  # two apostrophes are an inch mark, not feet
+    s = re.sub(r"\b(in|ft|cm|mm|inch|inches)\.(?=\s|$)", r"\1", s, flags=re.I)  # "58 in. W"
+    s = re.sub(r"\(\s*([WDHL])\s*\)", r" \1 ", s, flags=re.I)  # "180 cm (L)"
+    # "4 ft 10.5 in", 5'3": one length written in two units becomes one number, before anything is split on "x"
+    s = _FT_AND_IN.sub(lambda m: f"{_to_float(m.group(1)) * 0.3048 + _to_float(m.group(2)) * 0.0254:.4f} m", s)
     s = re.sub(r"(\d),(\d{3})(?!\d)", r"\1\2", s)  # 1,800 -> 1800 (thousands separators)
     labelled: dict[str, float] = {}
     unit_seen: str | None = None
@@ -261,13 +289,18 @@ def _parse_dimensions(text: str | None, default_unit: str | None = None, categor
         units = [mt.group(i) for i in (2, 4, 6)]
         last_unit = next((u for u in reversed(units) if u), None) or trailing_unit or default_unit
         vals = []
+        guessed = None
         for v, u in zip(nums, units):
             factor, _ = _unit_factor(u or last_unit, None)
             if factor is None:
-                factor = UNIT_TO_M[_guess_unit(nums)]
+                guessed = _guess_unit(nums)
+                factor = UNIT_TO_M[guessed]
             vals.append(v * factor)
         # unlabelled: assume W x D x H
-        return _result(vals[0], vals[2], vals[1], raw, assumed_order=True, confidence=0.6)
+        out = _result(vals[0], vals[2], vals[1], raw, assumed_order=True, confidence=0.6)
+        if guessed:
+            out["guessed_unit"] = guessed
+        return out
 
     if len(comp) >= 3:
         return _result(comp[0], comp[2], comp[1], raw, assumed_order=True, confidence=0.55)

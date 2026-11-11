@@ -182,3 +182,26 @@ def test_a_shop_that_refused_is_left_alone_for_a_while():
     rl.take("other.example.com")  # only that shop
     t[0] += pf.REFUSED_HOST_S[429] + 1
     rl.take("shop.example.com")
+
+
+@pytest.mark.parametrize(
+    "text, category, want",
+    [
+        ("4 ft 10.5 in x 7 ft 3 in", "rug", (1.49, 2.21)),            # found live: a rug read as 0.27 m wide
+        ("5'3\" x 7'7\"", "rug", (1.6, 2.31)),
+        ("6 ft 2 in x 3 ft x 2 ft 6 in", "sofa", (1.88, 0.91)),
+        ("58 in. W x 16 in. D x 24 in. H", "tv_stand", (1.47, 0.41)),
+        ("180 cm (L) x 90 cm (W) x 75 cm (H)", "table_dining", (1.8, 0.9)),
+        ("80 x 34 x 33", "sofa", (2.03, 0.86)),                        # bare numbers that only make sense as inches
+        ("120 x 60 x 75", "desk", (1.2, 0.6)),                         # and bare numbers that are centimetres stay so
+        ("180 x 88 x 76 cm", "sofa", (1.8, 0.88)),
+    ],
+)
+def test_sizes_written_the_way_shops_write_them(text, category, want):
+    r = dims.parse_dimensions(text, category=category)
+    assert (round(r["width_m"], 2), round(r["depth_m"], 2)) == want
+
+
+def test_a_rug_is_read_from_its_two_measurements_and_is_not_an_estimate():
+    r = read(html({"@type": "Product", "name": "Geometric area rug", "description": "Size: 4 ft 10.5 in x 7 ft 3 in", "offers": {"price": "90", "priceCurrency": "USD"}}), "rug")
+    assert [round(v, 2) for v in r["dimensions_m"]][::2] == [1.49, 2.21] and not r["dims"].get("height_assumed")

@@ -260,3 +260,8 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
     hidden in plan view and was missing from the GLB; tag textures were not freed.
   - Odd argument types (lists for ids, infinite numbers) return readable errors.
   - Product names: "Desk with Bookshelf" is a desk, "Sofa Bed" a sofa. 240 tests.
+- 2026-11-11 (from the third complete live run: seven pieces, USD 1,129.77 of 1,500
+  with a 10 % buffer kept): sizes written as feet and inches ("4 ft 10.5 in x 7 ft
+  3 in", `5'3" x 7'7"`), "58 in. W", "180 cm (L)" and bare numbers that only make
+  sense as inches ("80 x 34 x 33" for a sofa) are read; a rug's two measurements
+  are a reading, not an estimate. 249 tests.
