@@ -8,5 +8,5 @@ regenerate:
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars \
   --window-size=1280,640 --force-device-scale-factor=2 \
   --screenshot=/tmp/banner@2x.png "file://$PWD/docs/banner-src/banner.html"
-sips -Z 1280 /tmp/banner@2x.png --out docs/banner.png
+sips -Z 1280 /tmp/banner@2x.png --out docs/banner.png   # then re-save without metadata
 ```
