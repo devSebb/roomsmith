@@ -119,6 +119,8 @@ def summary_text(scene: dict, issues: list[dict] | None = None, revision: int | 
     budget = money.budget_status(scene)
     if budget:
         lines.append(budget["text"] + ".")
+    if scene.get("style"):
+        lines.append(f"Style the user asked for: {scene['style']}.")
     lines.append("Walls: " + "; ".join(f"{w['id']} ({w.get('label') or 'wall'}) {_f(m.wall_length(scene, w))} m" for w in room["walls"]))
     if room["openings"]:
         lines.append(
@@ -154,6 +156,7 @@ def compact(scene: dict, issues: list[dict] | None = None, revision: int | None 
     budget = money.budget_status(scene)
     return {
         **({"budget": budget} if budget else {}),
+        **({"style": scene["style"]} if scene.get("style") else {}),
         "project": scene["project"],
         "revision": revision,
         "calibration": scene.get("calibration"),

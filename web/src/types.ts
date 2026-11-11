@@ -22,6 +22,7 @@ export interface Scene {
   objects: SceneObject[]
   photos: unknown[]
   budget?: { limit: number; currency: string | null; reserve: number } | null
+  style?: string | null
 }
 /** Mirrors rs_core/money.budget_status. */
 export interface BudgetStatus {

@@ -777,6 +777,7 @@ def _clamp_openings_to_walls(scene: dict) -> None:
 
 # ---------------------------------------------------------------- products and budget
 
+STYLE_MAX = 120
 PRODUCT_KEYS = ("title", "url", "image_url", "image_data", "price", "price_amount", "price_currency", "dimensions_text", "assumed_order", "source")
 
 
@@ -838,6 +839,17 @@ def op_set_budget(scene: dict, op: dict) -> OpResult:
     return OpResult("set_budget", text, [])
 
 
+def op_set_style(scene: dict, op: dict) -> OpResult:
+    """The look the user asked for ("warm minimalist", "mid-century, light wood"), in
+    their words. The agent shops with it; the plugin stores and shows it, nothing more."""
+    text = product_fetch.clean_text(op.get("style"), STYLE_MAX) if isinstance(op.get("style"), str) else None
+    if not text:
+        scene.pop("style", None)
+        return OpResult("set_style", "Removed the style", [])
+    scene["style"] = text
+    return OpResult("set_style", f"Set the style to '{text}'", [])
+
+
 def op_clear_budget(scene: dict, op: dict) -> OpResult:
     scene.pop("budget", None)
     return OpResult("clear_budget", "Removed the budget", [])
@@ -865,12 +877,15 @@ OPS: dict[str, Callable[[dict, dict], OpResult]] = {
     "calibrate": op_calibrate,
     "set_budget": op_set_budget,
     "clear_budget": op_clear_budget,
+    "set_style": op_set_style,
 }
 
 # Friendly aliases the model may produce
 ALIASES = {
     "add": "add_object",
     "budget": "set_budget",
+    "style": "set_style",
+    "clear_style": "set_style",
     "remove_budget": "clear_budget",
     "move": "move_object",
     "rotate": "rotate_object",

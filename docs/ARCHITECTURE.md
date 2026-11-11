@@ -103,6 +103,10 @@ is the one place totals are computed; products with no readable price or in
 another currency are listed and not counted. Going over raises an `over_budget`
 issue and a note for the agent. Nothing is blocked: the decision is the user's.
 
+A room can also carry a `style` (the look the user asked for, in their words;
+`set_style`). The agent searches with it and the editor shows it. The plugin
+does not judge style, and the shortlist says so in its reply.
+
 `roomsmith_shortlist` takes up to six candidate products for one spot. For each
 it reads the page (cached), tests the size with the same `fitcheck` functions
 the editor uses, checks the door, compares the price with what is left, and

@@ -133,6 +133,7 @@ export function App(props: AppProps) {
           <button className={tab === 'add' ? 'on' : ''} onClick={() => setTab('add')}>Add</button>
         </div>
         {scene && s.budget && <BudgetBar b={s.budget} onClick={() => setTab('room')} />}
+        {scene?.style && <div className="rs-style" onClick={() => setTab('room')} title="The look you asked Hermes for">Style · <b>{scene.style}</b></div>}
         <div className="rs-body">
           {!scene && <div className="rs-muted">Open or create a room to start.</div>}
           {scene && tab === 'objects' && (selected ? <ObjectInspector store={store} scene={scene} o={selected} openExternal={props.openExternal} /> : <ObjectList store={store} scene={scene} issues={s.issues} onFocus={id => ed?.focus(id)} />)}
@@ -256,8 +257,17 @@ function BudgetFields({ store, scene }: { store: Store; scene: Scene }) {
         {b && <button className="rs-btn sm" onClick={() => store.apply([{ op: 'clear_budget' }])}>Remove</button>}
       </div>
       <div className="rs-faint">{b ? 'Products with a price count toward it. Going over is shown, never blocked.' : 'Optional. Or tell Hermes: “furnish this for under 1,500”.'}</div>
+      <h4>Style</h4>
+      <StyleField store={store} scene={scene} />
     </>
   )
+}
+
+function StyleField({ store, scene }: { store: Store; scene: Scene }) {
+  const [v, setV] = React.useState(scene.style || '')
+  React.useEffect(() => setV(scene.style || ''), [scene.style])
+  const commit = () => { if (v.trim() !== (scene.style || '')) store.apply([{ op: 'set_style', style: v.trim() }]) }
+  return <div className="rs-row"><input className="rs-in" placeholder="e.g. warm minimalist, light wood" maxLength={120} value={v} onChange={e => setV(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} /></div>
 }
 
 function PriceField({ store, o }: { store: Store; o: SceneObject }) {

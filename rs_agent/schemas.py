@@ -133,6 +133,7 @@ APPLY = {
         "- add_opening {wall: id or label ('front'), kind: 'door'|'window'|'opening', width_m? (door 0.9, window 1.2), offset_m | position_fraction (0..1 along the wall), height_m?, sill_m?, swing?, hinge?}\n"
         "- update_opening {id, ...same fields} | remove_opening {id}\n"
         "- set_budget {limit, currency?, reserve? | reserve_percent?} records the user's budget for the room (the user's number; a buffer only if they asked for one) | clear_budget {}\n"
+        "- set_style {style} records the look the user asked for in their words ('warm minimalist, light wood'); use it when you search for products | set_style {} clears it\n"
         "- calibrate {reference: {kind: 'room_size', width_m, depth_m}} fits the room to its real floor size (each axis separately — photos stretch depth more than width), keeps furniture sizes, keeps things against their walls. PREFER this when the user knows the room's size. "
         "Or {reference: {kind: 'wall_length'|'room_height'|'opening_width', id, real_m}} (room + positions; furniture sizes kept) or {kind: 'object_width'|'object_height'|'object_depth', id, real_m} (scales everything estimated).\n"
         "Placing or moving a floor piece with against_wall/next_to/in_corner/centered_in_room slides it to the nearest clear spot if it would land inside another piece or in a doorway's clear zone "
@@ -191,6 +192,7 @@ APPLY["parameters"]["properties"]["operations"]["items"] = {
         "currency": {"type": "string", "description": "set_budget: USD, EUR, ..."},
         "reserve": {"type": "number", "description": "set_budget: amount the user wants kept back (omit for none)"},
         "reserve_percent": {"type": "number"},
+        "style": {"type": "string", "description": "set_style: the look the user asked for, in their words"},
         "product": {"type": "object", "description": "update_object: e.g. {price: '$120'} when the user tells you a price"},
     },
     "required": ["op"],

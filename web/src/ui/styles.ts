@@ -55,6 +55,8 @@ export const CSS = `
 .rs-budget.over .rs-left{color:var(--rs-bad);font-weight:600}
 .rs-budget .rs-tick{position:absolute;top:0;bottom:0;width:2px;background:currentColor;opacity:.55}
 .rs-item .rs-price{color:var(--rs-muted);font-size:11px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rs-style{padding:6px 10px;border-bottom:1px solid var(--rs-line);font-size:12px;color:var(--rs-muted);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rs-style b{color:inherit;font-weight:600}
 .rs-showcase .rs-help,.rs-showcase .rs-draft{display:none}
 .rs-muted{color:var(--rs-muted);font-size:12px}
 .rs-faint{color:var(--rs-faint);font-size:11px}

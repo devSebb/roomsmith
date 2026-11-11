@@ -556,6 +556,9 @@ class RoomService:
         }
         if status:
             out["budget"] = {k: status[k] for k in ("limit", "currency", "reserve", "spent", "remaining", "remaining_spendable", "text")}
+        if scene.get("style"):
+            out["style"] = scene["style"]
+            out["style_note"] = "The plugin checked size and price, not style. Choosing what suits the style among the rows that fit is your judgement: say so."
         return out
 
     def _shortlist_row(self, scene: dict, cand: dict, url: str | None, cat: str | None, place: dict | None, old: dict | None, ignore: list[str], status: dict | None, ceiling: tuple | None, out_of_time: bool) -> dict:

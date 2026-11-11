@@ -102,6 +102,13 @@ going over is the user's decision.
    **once**: "Do you want to keep some of that back as a buffer?" An amount or
    a percentage → pass `reserve` or `reserve_percent`. "No", or no answer → no
    buffer. Then `roomsmith_apply` `{"op": "set_budget", "limit": 1500, "currency": "USD"}`.
+   If the user named a look ("warm minimalist", "mid-century, light wood",
+   "like this photo"), record it in their words:
+   `{"op": "set_style", "style": "warm minimalist, light wood"}`. Put those
+   words in your product searches, and among the rows that fit prefer the ones
+   that suit it. That choice is your judgement from the product's name and
+   photo: say "I picked these for the look", never "the plugin matched the
+   style". The plugin stores and shows the style; it checks size and price.
 2. `roomsmith_inspect`. Decide which pieces the room needs, largest first, and
    roughly what share of the money each can take. Tell the user the list in one
    short message, then start.

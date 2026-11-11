@@ -40,6 +40,8 @@ def validate_hard(scene: dict) -> None:
             raise SceneError("invalid_value", f"Corner {v.get('id')} has a non-finite coordinate", id=v.get("id"))
         pts.append((float(x), float(z)))
     _validate_budget(scene.get("budget"))
+    if scene.get("style") is not None and not (isinstance(scene["style"], str) and 0 < len(scene["style"]) <= 200):
+        raise SceneError("invalid_value", "style must be a short text", field="style")
     if not g.polygon_is_simple(pts):
         raise SceneError("invalid_room", "The room outline crosses itself or has a zero-length wall")
     if g.polygon_area(pts) < 0.1:

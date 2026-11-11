@@ -188,3 +188,18 @@ def test_shopping_list_has_prices_and_a_total(svc, room):
     add(svc, room, "Rug", None)
     text = svc.export_bytes(room, "summary")[0].decode()
     assert "Desk" in text and "USD 249.99" in text and "Total: USD 349.99" in text and "price not known" in text and "Budget USD 1,000" in text
+
+
+def test_style_is_the_users_words_stored_shown_and_undoable(svc, room):
+    r = ops(svc, room, {"op": "set_style", "style": "  warm   minimalist, <b>light wood</b>  "})
+    assert r["ok"] and r["summary"] == "Set the style to 'warm minimalist, light wood'"
+    out = svc.inspect(room)
+    assert out["style"] == "warm minimalist, light wood" and "Style the user asked for: warm minimalist, light wood." in out["text"]
+    short = svc.shortlist(room, "desk", [{"title": "Desk", "dimensions_m": [1.0, 0.75, 0.5], "price": "$90"}])
+    assert short["style"] == "warm minimalist, light wood" and "not style" in short["style_note"]
+    assert len(svc.scene(room)["scene"]["style"]) <= 120
+    assert ops(svc, room, {"op": "set_style", "style": "x" * 500})["ok"] and len(svc.scene(room)["scene"]["style"]) == 120
+    svc.undo(room)
+    assert svc.scene(room)["scene"]["style"] == "warm minimalist, light wood"
+    assert ops(svc, room, {"op": "set_style"})["summary"] == "Removed the style" and "style" not in svc.scene(room)["scene"]
+    assert "style" not in svc.inspect(room)

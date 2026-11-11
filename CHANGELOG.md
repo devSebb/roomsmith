@@ -181,3 +181,6 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
   and handle; a door or window in a wall you are looking through is hidden.
   Prices show with a currency symbol. New **Showcase** button: the camera circles
   the room until you drag. Things placed "in front of" a piece now face it.
+- 2026-11-10 (late): `set_style` records the look the user asked for; Hermes shops
+  with it, the editor shows it, inspect and the shortlist return it. The plugin
+  does not judge style and says so. 203 tests.

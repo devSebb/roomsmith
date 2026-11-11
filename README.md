@@ -44,7 +44,9 @@ The editor is the same in the Hermes Desktop pane, the Desktop full page and the
   arrives at true size and the editor's budget bar fills. Totals are exact. The
   budget is yours: the plugin reports when the room goes over and Hermes asks
   you; nothing is blocked and nothing is bought. A buffer is kept back only if
-  you ask for one.
+  you ask for one. Name a look ("warm minimalist, light wood") and Hermes shops
+  with it; the room remembers it. Choosing what suits the look is Hermes's
+  judgement. The plugin checks size and price, not taste.
 - **Photo → draft room.** Hermes reads a photo and builds walls, door and window
   guesses, and the furniture it sees as sized boxes. Sizes are estimates until
   you give one real measurement (a wall, the door); then the whole room rescales.
@@ -97,7 +99,7 @@ plugin says so and builds the room from the sizes you give it instead.
 > add a 2.1 m sofa against the back wall and a coffee table in front of it
 > would a 1.6 m wide bookshelf fit on the right wall?
 > would this fit where the sofa is? https://www.castlery.com/us/products/hamilton-sofa
-> furnish this as a bedroom with a desk for under 1,000 dollars
+> furnish this as a bedroom with a desk for under 1,000 dollars, warm minimalist, light wood
 > swap the desk for a cheaper one
 > /room
 ```
@@ -124,7 +126,7 @@ desktop/plugin.js          the editor as a Hermes Desktop plugin (built)
 web/                       editor source (TypeScript, three.js, React) + build
 skills/room-design/        how the agent should work with a room
 tests/                     pytest (engine, tools, backend, product pages, budget,
-                           shortlist, hardening) — 201 tests
+                           shortlist, hardening) — 203 tests
 docs/                      architecture, compatibility record, screenshots
 ```
 
