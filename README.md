@@ -126,7 +126,7 @@ desktop/plugin.js          the editor as a Hermes Desktop plugin (built)
 web/                       editor source (TypeScript, three.js, React) + build
 skills/room-design/        how the agent should work with a room
 tests/                     pytest (engine, tools, backend, product pages, budget,
-                           shortlist, hardening) — 210 tests
+                           shortlist, hardening) — 211 tests
 docs/                      architecture, compatibility record, screenshots
 ```
 

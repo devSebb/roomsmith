@@ -218,3 +218,7 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
   and sizes match the reply. From that run: a piece that would not pass the door
   assembled (every queen bed) is now cautioned on its row, not dropped from the
   recommendation. 210 tests.
+- 2026-11-10 (second complete live run, a cheap DeepSeek model): four real products
+  for USD 787.98 of 800 in 102 seconds. From that run: a unit printed on one
+  labelled value ("W 27.5 x D 27.5 x H 34.5 inches") now applies to the values
+  beside it; before, the first two were read as centimetres. 211 tests.

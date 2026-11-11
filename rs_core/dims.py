@@ -207,19 +207,17 @@ def _parse_dimensions(text: str | None, default_unit: str | None = None, categor
         inch = _to_float(mt.group(2)) if mt.group(2) else 0.0
         comp.append(ft * 0.3048 + inch * 0.0254)
 
+    # labelled values first; a unit printed on one of them ("W 27.5 x D 27.5 x H 34.5 inches")
+    # is the unit of the ones printed without, before any guess from the numbers
+    found: list[tuple[int, str, float, str | None]] = []
     for mt in _LABEL_FIRST.finditer(s):
-        label = LABELS[mt.group(1).lower()]
-        factor, u = _unit_factor(mt.group(3), trailing_unit or default_unit)
-        val = _to_float(mt.group(2))
-        if factor is None:
-            factor = UNIT_TO_M[_guess_unit([val])]
-        else:
-            unit_seen = u
-        labelled.setdefault(label, val * factor)
+        found.append((mt.start(), LABELS[mt.group(1).lower()], _to_float(mt.group(2)), mt.group(3)))
     for mt in _VALUE_FIRST.finditer(s):
-        label = LABELS[mt.group(3).lower()]
-        factor, u = _unit_factor(mt.group(2), trailing_unit or default_unit)
-        val = _to_float(mt.group(1))
+        found.append((mt.start(), LABELS[mt.group(3).lower()], _to_float(mt.group(1)), mt.group(2)))
+    # label-first matches keep priority over value-first ones ("Width: 228 cm Depth: 93 cm" must not read 228 as the depth)
+    shared = trailing_unit or default_unit or next((u for _, _, _, u in found if _unit_factor(u, None)[0] is not None), None)
+    for _, label, val, unit in found:
+        factor, u = _unit_factor(unit, shared)
         if factor is None:
             factor = UNIT_TO_M[_guess_unit([val])]
         else:

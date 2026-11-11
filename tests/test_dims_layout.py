@@ -227,3 +227,13 @@ def test_sizes_are_turned_to_match_the_category_when_the_shop_labels_them_the_ot
     plain = dims.parse_dimensions("120 x 60 x 75 cm", category="desk")
     assert round(plain["width_m"], 2) == 1.2 and not plain.get("reoriented")
     assert not dims.parse_dimensions("61 x 106 x 76 cm")["width_m"] == 1.06  # no category: left as read
+
+
+def test_a_unit_printed_once_applies_to_the_labelled_values_beside_it():
+    """Found live: 'W 27.5 x D 27.5 x H 34.5 inches' read the first two as centimetres."""
+    from rs_core import dims
+
+    c = dims.parse_dimensions("W 27.5 x D 27.5 x H 34.5 inches overall; seat height adjusts from 17 to 20.75 inches from floor", category="chair")
+    assert [round(c[k], 2) for k in ("width_m", "depth_m", "height_m")] == [0.7, 0.7, 0.88]
+    m = dims.parse_dimensions("Width: 180 cm, Depth: 88, Height: 76", category="sofa")
+    assert [round(m[k], 2) for k in ("width_m", "depth_m", "height_m")] == [1.8, 0.88, 0.76]
