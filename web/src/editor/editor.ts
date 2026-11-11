@@ -200,6 +200,7 @@ export class Editor {
     }
     if (this.mode === '3d') this.controls.update()
     this.fadeWalls()
+    this.sizeLabels()
     this.render()
     this.animating = moving
   }
@@ -395,6 +396,19 @@ export class Editor {
       this.controls.update()
     }
     this.flash([id])
+  }
+
+  /** Name tags and product cards stay readable when the camera is far from the room:
+   *  they grow with distance (up to 2.4x) and never shrink below their drawn size. */
+  private sizeLabels() {
+    const at = new THREE.Vector3()
+    for (const v of this.objects.values()) {
+      const l = v.label
+      if (!l) continue
+      const base = (l.userData.base ||= l.scale.clone()) as THREE.Vector3
+      const k = this.mode !== '3d' ? 1 : Math.min(2.4, Math.max(1, l.getWorldPosition(at).distanceTo(this.persp.position) / 5.5))
+      l.scale.set(base.x * k, base.y * k, 1)
+    }
   }
 
   private fadeWalls() {
