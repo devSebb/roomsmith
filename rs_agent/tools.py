@@ -106,7 +106,7 @@ def _trim_inspect(out: dict) -> dict:
     """Keep inspect replies compact for the model: text first, numbers second."""
     if not out.get("ok"):
         return out
-    keep = {k: out[k] for k in ("ok", "project_id", "name", "revision", "can_undo", "can_redo", "text", "issues", "created", "notes", "steps", "summary") if k in out}
+    keep = {k: out[k] for k in ("ok", "project_id", "name", "revision", "can_undo", "can_redo", "text", "issues", "created", "notes", "steps", "summary", "budget") if k in out}
     keep["room"] = out.get("room")
     keep["objects"] = out.get("objects")
     keep["calibration"] = (out.get("calibration") or {}).get("status")
@@ -259,6 +259,8 @@ def slash_room(raw_args: str = "") -> str:
             return "No rooms yet. Say 'make a 4 by 5 metre room' or attach a photo and ask for a room."
         issues = [i for i in out["issues"] if i["code"] != "uncalibrated"]
         lines = [out["text"].split("\n")[0], f"Revision {out['revision']}; {len(out['objects'])} objects; {len(issues)} issue(s)."]
+        if out.get("budget"):
+            lines.append(out["budget"]["text"])
         for i in issues[:5]:
             lines.append(f"  - {i['message']}")
         lines.append(EDITOR_HINT)

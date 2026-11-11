@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 from rs_core import geometry as g
 from rs_core import model as m
-from rs_core import placement
+from rs_core import money, placement, product_fetch
 from rs_core.catalog import normalize_category, spec_for
 from rs_core.model import SceneError
 
@@ -334,7 +334,7 @@ def op_add_object(scene: dict, op: dict) -> OpResult:
         shape=_str(op["shape"], "shape", m.SHAPES) if "shape" in op else None,
         mount=_str(op["mount"], "mount", m.MOUNTS) if "mount" in op else None,
         provenance=provenance,
-        product=op.get("product") if isinstance(op.get("product"), dict) else None,
+        product=normalise_product(op.get("product")),
         locked=bool(op.get("locked", False)),
     )
     if "yaw_rad" in op:
@@ -467,7 +467,13 @@ def op_update_object(scene: dict, op: dict) -> OpResult:
         obj["mount"] = _str(fields["mount"], "mount", m.MOUNTS)
         changed.append("mount")
     if "product" in fields:
-        obj["product"] = fields["product"] if isinstance(fields["product"], dict) else None
+        patch = fields["product"]
+        if isinstance(patch, dict) and isinstance(obj.get("product"), dict):
+            patch = {**obj["product"], **patch}  # a partial product (just a price) updates the one that is there
+            if "price" in fields["product"] and "price_amount" not in fields["product"]:
+                patch.pop("price_amount", None)
+                patch.pop("price_currency", None)
+        obj["product"] = normalise_product(patch)
         changed.append("product")
     if "provenance" in fields and isinstance(fields["provenance"], dict):
         obj["provenance"] = {**obj.get("provenance", {}), **fields["provenance"]}
@@ -769,6 +775,74 @@ def _clamp_openings_to_walls(scene: dict) -> None:
     scene["room"]["openings"] = kept
 
 
+# ---------------------------------------------------------------- products and budget
+
+PRODUCT_KEYS = ("title", "url", "image_url", "image_data", "price", "price_amount", "price_currency", "dimensions_text", "assumed_order", "source")
+
+
+def normalise_product(product: Any) -> dict | None:
+    """Keep the known fields of a product record, read its price into numbers, and
+    drop a link that is not a public http(s) URL."""
+    if not isinstance(product, dict):
+        return None
+    out = {k: product[k] for k in PRODUCT_KEYS if product.get(k) is not None}
+    if isinstance(out.get("title"), str):
+        out["title"] = out["title"].strip()[:120]
+    for key in ("url", "image_url"):
+        if key in out:
+            try:
+                out[key] = product_fetch.check_url(str(out[key]))
+            except product_fetch.FetchError:
+                out.pop(key)
+    data = out.get("image_data")
+    if data is not None and not (isinstance(data, str) and data.startswith("data:image/") and len(data) <= 200_000):
+        out.pop("image_data")
+    if out.get("price") is not None:
+        out["price"] = str(out["price"]).strip()[:40]
+    price = money.product_price(out)
+    if price is None:
+        out.pop("price_amount", None)
+        out.pop("price_currency", None)
+    else:
+        out["price_amount"] = price[0]
+        if price[1]:
+            out["price_currency"] = price[1]
+    return out
+
+
+def op_set_budget(scene: dict, op: dict) -> OpResult:
+    """The user's budget for this room. No default amount and no default buffer."""
+    _require(op, "limit")
+    parsed = money.parse_price(op["limit"])
+    if parsed is None:
+        raise SceneError("invalid_value", "limit must be a positive amount, e.g. 1500 or '$1,500'", field="limit")
+    limit, found = parsed
+    prior = scene.get("budget") if isinstance(scene.get("budget"), dict) else {}
+    currency = money.currency_code(op.get("currency")) or found or money.currency_code(prior.get("currency"))
+    if op.get("currency") and not money.currency_code(op.get("currency")):
+        raise SceneError("invalid_value", "currency must be a three-letter code such as USD or EUR", field="currency")
+    reserve = 0.0
+    if op.get("reserve") is not None:
+        got = money.parse_price(op["reserve"]) if op["reserve"] not in (0, "0", 0.0) else (0.0, None)
+        if got is None:
+            raise SceneError("invalid_value", "reserve must be an amount, or leave it out for no buffer", field="reserve")
+        reserve = got[0]
+    elif op.get("reserve_percent") is not None:
+        reserve = round(limit * _num(op["reserve_percent"], "reserve_percent", 0, 50) / 100, 2)
+    if reserve >= limit:
+        raise SceneError("out_of_range", "The amount kept back must be smaller than the budget", field="reserve")
+    scene["budget"] = {"limit": limit, "currency": currency, "reserve": reserve}
+    text = f"Set the budget to {money.format_money(limit, currency)}"
+    if reserve:
+        text += f" ({money.format_money(reserve, currency)} kept back)"
+    return OpResult("set_budget", text, [])
+
+
+def op_clear_budget(scene: dict, op: dict) -> OpResult:
+    scene.pop("budget", None)
+    return OpResult("clear_budget", "Removed the budget", [])
+
+
 # ---------------------------------------------------------------- dispatcher
 
 OPS: dict[str, Callable[[dict, dict], OpResult]] = {
@@ -789,11 +863,15 @@ OPS: dict[str, Callable[[dict, dict], OpResult]] = {
     "remove_object": op_remove_object,
     "swap_objects": op_swap_objects,
     "calibrate": op_calibrate,
+    "set_budget": op_set_budget,
+    "clear_budget": op_clear_budget,
 }
 
 # Friendly aliases the model may produce
 ALIASES = {
     "add": "add_object",
+    "budget": "set_budget",
+    "remove_budget": "clear_budget",
     "move": "move_object",
     "rotate": "rotate_object",
     "resize": "set_dimensions",

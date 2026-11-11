@@ -6,6 +6,7 @@ import math
 
 from rs_core import geometry as g
 from rs_core import model as m
+from rs_core import money
 
 
 def _f(v: float) -> str:
@@ -115,6 +116,9 @@ def summary_text(scene: dict, issues: list[dict] | None = None, revision: int | 
     ]
     if not m.is_rectangle(scene):
         lines[0] += f" Outline has {len(room['vertices'])} corners (not a rectangle)."
+    budget = money.budget_status(scene)
+    if budget:
+        lines.append(budget["text"] + ".")
     lines.append("Walls: " + "; ".join(f"{w['id']} ({w.get('label') or 'wall'}) {_f(m.wall_length(scene, w))} m" for w in room["walls"]))
     if room["openings"]:
         lines.append(
@@ -147,7 +151,9 @@ def summary_text(scene: dict, issues: list[dict] | None = None, revision: int | 
 
 def compact(scene: dict, issues: list[dict] | None = None, revision: int | None = None) -> dict:
     rw, rd = m.room_size(scene)
+    budget = money.budget_status(scene)
     return {
+        **({"budget": budget} if budget else {}),
         "project": scene["project"],
         "revision": revision,
         "calibration": scene.get("calibration"),
@@ -169,16 +175,37 @@ def compact(scene: dict, issues: list[dict] | None = None, revision: int | None 
 
 
 def shopping_list(scene: dict) -> str:
+    """Everything in the room with sizes; products with price and link; totals when priced."""
+    budget = scene.get("budget") if isinstance(scene.get("budget"), dict) else {}
+    cur = money.currency_code(budget.get("currency"))
     lines = [f"Roomsmith — {scene['project']['name']}", ""]
+    totals: dict[str | None, int] = {}
+    unpriced = 0
     for obj in scene["objects"]:
         w, h, d = obj["dimensions_m"]
         line = f"- {obj['name']}: {_f(w)} x {_f(h)} x {_f(d)} m (w x h x d)"
         p = obj.get("product") or {}
-        if p.get("title"):
+        if p.get("title") and p["title"] != obj["name"]:
             line += f" — {p['title']}"
-        if p.get("price"):
-            line += f", {p['price']}"
+        price = money.product_price(p) if p else None
+        if price:
+            line += f", {money.format_money(price[0], price[1] or cur)}"
+            totals[price[1] or cur] = totals.get(price[1] or cur, 0) + round(price[0] * 100)
+        elif p:
+            line += ", price not known"
+            unpriced += 1
         if p.get("url"):
             line += f"\n  {p['url']}"
         lines.append(line)
+    if totals:
+        lines.append("")
+        for c, cents in totals.items():
+            lines.append(f"Total: {money.format_money(cents / 100, c)}")
+        if unpriced:
+            lines.append(f"({unpriced} product(s) without a known price are not in the total.)")
+    status = money.budget_status(scene)
+    if status:
+        lines.append(status["text"])
+    if totals:
+        lines.append("Prices as read from the product pages; they can change.")
     return "\n".join(lines)

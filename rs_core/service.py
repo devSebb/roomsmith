@@ -16,7 +16,7 @@ from typing import Any
 from rs_core import dims as dims_mod
 from rs_core import product_fetch
 from rs_core import geometry as g
-from rs_core import export_glb, fitcheck, layout, media, ops, summarize, validate
+from rs_core import export_glb, fitcheck, layout, media, money, ops, summarize, validate
 from rs_core import model as m
 from rs_core.catalog import normalize_category
 from rs_core.model import SceneError
@@ -177,6 +177,7 @@ class RoomService:
         out = {"ok": True, "project_id": pid, "revision": rev, "scene": scene}
         if with_issues:
             out["issues"] = validate.issues(scene)
+        out["budget"] = money.budget_status(scene)
         undo, redo = self.store.history_stacks(pid)
         out["can_undo"] = bool(undo)
         out["can_redo"] = bool(redo)
@@ -208,7 +209,7 @@ class RoomService:
     # ------------------------------------------------------------ writes
 
     def apply(self, command: dict) -> dict:
-        """Apply one atomic batch. See plan section 7 for the envelope."""
+        """Apply one atomic batch (docs/ARCHITECTURE.md, "The command contract")."""
         if not isinstance(command, dict):
             return _err("invalid_value", "command must be an object")
         pid = self._resolve_project(command.get("project_id"))
@@ -251,7 +252,8 @@ class RoomService:
             summary = f"{who}: {batch.summary}"
             changed = batch.changed_ids
             issues = validate.issues(new_scene)
-            touched_issues = [i for i in issues if not i["ids"] or set(i["ids"]) & set(changed)]
+            touched_issues = [i for i in issues if not i["ids"] or set(i["ids"]) & set(changed) or i["code"] == "over_budget"]
+            budget = money.budget_status(new_scene)
             result = {
                 "ok": True,
                 "project_id": pid,
@@ -261,6 +263,8 @@ class RoomService:
                 "issues": touched_issues,
                 "all_issue_count": len([i for i in issues if i["code"] != "uncalibrated"]),
             }
+            if budget:
+                result["budget"] = budget
             try:
                 new_rev = self.store.commit_revision(pid, current, new_scene, actor, summary, changed, command_id=str(command_id) if command_id else None, result=result)
             except RevisionConflict as e:
@@ -456,6 +460,12 @@ class RoomService:
             pass
         if parsed and parsed.get("assumed_order"):
             res["note"] = parsed["order_note"]
+        status = money.budget_status(scene)
+        if status:
+            res["budget"] = status
+            note = money.budget_note(status, money.parse_price(price, status["currency"]))
+            if note:
+                res["budget_note"] = note
         return res
 
     # ------------------------------------------------------------ products from links

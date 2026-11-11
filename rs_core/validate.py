@@ -13,6 +13,7 @@ from typing import Iterable
 
 from rs_core import geometry as g
 from rs_core import model as m
+from rs_core import money
 from rs_core.model import SceneError
 
 OVERLAP_MIN_DEPTH = 0.01      # m of penetration before two objects "overlap"
@@ -38,6 +39,7 @@ def validate_hard(scene: dict) -> None:
         if not g.is_finite(x, z):
             raise SceneError("invalid_value", f"Corner {v.get('id')} has a non-finite coordinate", id=v.get("id"))
         pts.append((float(x), float(z)))
+    _validate_budget(scene.get("budget"))
     if not g.polygon_is_simple(pts):
         raise SceneError("invalid_room", "The room outline crosses itself or has a zero-length wall")
     if g.polygon_area(pts) < 0.1:
@@ -131,10 +133,44 @@ def issues(scene: dict, only_ids: Iterable[str] | None = None) -> list[dict]:
                 "message": "Sizes are estimates until you give one real measurement (a wall, a door or an object).",
             }
         )
+    out += _over_budget(scene)
     if only_ids is not None:
         keep = set(only_ids)
         out = [i for i in out if not i["ids"] or keep.intersection(i["ids"])]
     return out
+
+
+def _validate_budget(budget: object) -> None:
+    if budget is None:
+        return
+    ok = isinstance(budget, dict) and isinstance(budget.get("limit"), (int, float)) and not isinstance(budget.get("limit"), bool)
+    if ok:
+        limit, reserve, cur = float(budget["limit"]), budget.get("reserve", 0.0), budget.get("currency")
+        ok = (
+            math.isfinite(limit) and 0 < limit <= money.MAX_AMOUNT
+            and isinstance(reserve, (int, float)) and not isinstance(reserve, bool) and math.isfinite(reserve) and 0 <= reserve < limit
+            and (cur is None or (isinstance(cur, str) and money.currency_code(cur) == cur))
+        )
+    if not ok:
+        raise SceneError("invalid_value", "budget must be {limit > 0, currency: 'USD' or null, reserve: 0 <= amount < limit}", field="budget")
+
+
+def _over_budget(scene: dict) -> list[dict]:
+    """The one money issue: the room costs more than the budget the user gave.
+    Reported, never enforced."""
+    status = money.budget_status(scene)
+    if not status or not status["over_limit"]:
+        return []
+    cur = status["currency"]
+    return [
+        {
+            "code": "over_budget",
+            "severity": "warning",
+            "ids": [i["id"] for i in status["items"]],
+            "message": f"{money.format_money(status['spent'], cur)} spent of {money.format_money(status['limit'], cur)}: {money.format_money(-status['remaining'], cur)} over",
+            "over": -status["remaining"],
+        }
+    ]
 
 
 def _overlaps(scene: dict) -> list[dict]:
