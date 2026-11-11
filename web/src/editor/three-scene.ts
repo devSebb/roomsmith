@@ -156,7 +156,7 @@ export class ObjectView {
   }
   private applyOpacity() {
     const o = this.obj.mount === 'ceiling' ? 0.45 : this.obj.locked ? 0.95 : 1 // hanging things must not hide the room under them
-    for (const p of this.parts) { const m = p.material as THREE.MeshStandardMaterial; m.transparent = true; m.opacity = o }
+    for (const p of this.parts) { const m = p.material as THREE.MeshStandardMaterial; m.transparent = true; m.opacity = o * ((m.userData.keepOpacity as number) ?? 1) } // glass stays glass
   }
   setHighlight(mode: 'none' | 'selected' | 'hover' | 'bad' | 'flash', theme: Theme) {
     let emissive = new THREE.Color(0x000000), k = 0

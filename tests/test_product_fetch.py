@@ -210,3 +210,21 @@ def test_offers_shaped_as_lists_and_pages_that_break_the_reader_do_not_raise():
 
     r = pf.fetch_product("https://shop.example.com/p/y", _get=boom)
     assert r["ok"] is False and r["error"]["code"] == "unreadable" and "RuntimeError" in r["error"]["message"]
+
+
+def test_a_products_colour_comes_from_its_name_before_its_photo(tmp_path):
+    from rs_core import media
+    from rs_core.service import RoomService
+
+    assert media.colour_from_words("IKEA PS 2026 Floor uplighter, dark red, 72 \"") == "#7a1f26"
+    assert media.colour_from_words("TARVA Nightstand - pine") == "#d9bd8a"
+    assert media.colour_from_words("6-Shelf Ladder Bookshelf Oak Matte Black") == "#26262a"  # the last colour named
+    assert media.colour_from_words("STORKLINTA 3-drawer dresser - oak effect/anchor") == "#c2a06b"
+    assert media.colour_from_words("Hamilton Sofa") is None and media.colour_from_words(None) is None
+    svc = RoomService(tmp_path / "data.db", tmp_path)
+    svc.create_project("Room", 4, 4, 2.5)
+    r = svc.add_product(None, title="Floor uplighter, dark red", dimensions_m=[0.28, 1.83, 0.28], category="lamp_floor", actor="agent")
+    assert r["ok"] and svc.scene(None)["scene"]["objects"][0]["color"] == "#7a1f26"
+    r = svc.add_product(None, title="Chair", dimensions_m=[0.5, 0.9, 0.5], color="#112233", actor="agent")
+    assert svc.scene(None)["scene"]["objects"][1]["color"] == "#112233"  # a colour that was given is kept
+    svc.close()

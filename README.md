@@ -127,7 +127,7 @@ desktop/plugin.js          the editor as a Hermes Desktop plugin (built)
 web/                       editor source (TypeScript, three.js, React) + build
 skills/room-design/        how the agent should work with a room
 tests/                     pytest (engine, tools, backend, product pages, budget,
-                           shortlist, hardening) — 211 tests
+                           shortlist, hardening) — 212 tests
 docs/                      architecture, compatibility record, screenshots
 ```
 
@@ -225,8 +225,11 @@ the room facing that wall.
 - Furnishing to a budget needs a web search tool in your Hermes for finding
   products; without one, paste a few links per piece. Prices are as read at that
   moment. There is no currency conversion.
-- The furniture is drawn as simple stand-in shapes at true size, not as models of
-  the actual products.
+- The furniture is drawn as stand-in shapes at true size, not as models of the
+  actual products. The shapes follow what the product's name says (its colour or
+  wood, "round", "6-drawer", "5-tier ladder", "glass top", "metal legs",
+  "tripod"), so a round walnut coffee table is round and walnut; details the
+  name does not mention are generic. The product's photo is on its card.
 - Hermes Desktop: the Desktop's own right-click menu owns right-click on the
   canvas (pan with ⇧-drag or the middle button).
 

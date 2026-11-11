@@ -84,7 +84,8 @@ export function App(props: AppProps) {
     return () => { ro.disconnect(); mo.disconnect(); ed.dispose(); editorRef.current = null }
   }, [])
 
-  React.useEffect(() => { if (editorRef.current) { if (s.scene) editorRef.current.setScene(s.scene, s.issues, true); else editorRef.current.clear() } }, [s.scene, s.issues])
+  // being over budget is about the room, not about any one piece: it must not mark every product as a problem
+  React.useEffect(() => { if (editorRef.current) { if (s.scene) editorRef.current.setScene(s.scene, s.issues.filter(i => i.code !== 'over_budget'), true); else editorRef.current.clear() } }, [s.scene, s.issues])
   React.useEffect(() => { editorRef.current?.select(s.selectedId, false) }, [s.selectedId])
 
   const ed = editorRef.current
@@ -208,7 +209,7 @@ function NewRoom({ store, api, onDone, compact }: { store: Store; api: Api; onDo
 }
 
 function ObjectList({ store, scene, issues, onFocus }: { store: Store; scene: Scene; issues: Issue[]; onFocus: (id: string) => void }) {
-  const bad = new Set(issues.filter(i => i.code !== 'uncalibrated').flatMap(i => i.ids))
+  const bad = new Set(issues.filter(i => i.code !== 'uncalibrated' && i.code !== 'over_budget').flatMap(i => i.ids))
   if (!scene.objects.length) return <div className="rs-muted">No objects yet. Use the Add tab, or ask Hermes: “add a 2 m sofa against the back wall”.</div>
   return (
     <div className="rs-list">

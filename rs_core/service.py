@@ -447,8 +447,9 @@ class RoomService:
         thumb = self.product_thumbnail(image_url) if image_url else None
         if thumb:
             product["image_data"] = thumb
-            if not color:
-                color = media.product_color(thumb)  # the stand-in wears the product's colour, not a category default
+        if not color:
+            # the stand-in wears the product's colour, not a category default: the colour its name states, else its photo's
+            color = media.colour_from_words(title) or (media.product_color(thumb) if thumb else None)
         op: dict = {
             "op": "add_object",
             "name": title[:60],

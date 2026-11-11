@@ -222,3 +222,10 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
   for USD 787.98 of 800 in 102 seconds. From that run: a unit printed on one
   labelled value ("W 27.5 x D 27.5 x H 34.5 inches") now applies to the values
   beside it; before, the first two were read as centimetres. 211 tests.
+- 2026-11-10 (night): stand-ins look more like the products they stand for. A
+  product takes the colour its own name states ("dark red", "walnut", "oak
+  effect"), else its photo's. Shapes read cues from the name: round and oval
+  tops, nesting tables, glass tops, metal, brass or splayed wooden legs, the
+  number of drawers, doors, tiers or cubes, ladder shelves, cube organisers,
+  tripod and uplighter lamps, upholstered headboards, chaise sofas, stools. Being
+  over budget no longer marks every product as a problem. 212 tests.
