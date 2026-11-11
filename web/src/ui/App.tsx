@@ -314,7 +314,7 @@ function ObjectInspector({ store, scene, o, openExternal }: { store: Store; scen
           {p.image_url ? <img src={p.image_url} alt="" referrerPolicy="no-referrer" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} /> : null}
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 600 }}>{p.title}</div>
-            {p.price_amount ? <div className="rs-muted">{money(p.price_amount, p.price_currency)}</div> : null}
+            {p.price_amount ? <div className="rs-muted">{money(p.price_amount, p.price_currency || scene.budget?.currency)}</div> : null}
             {p.dimensions_text && <div className="rs-faint">{p.dimensions_text}{p.assumed_order ? ' (read as W×D×H)' : ''}</div>}
             {p.url && <a href={p.url} target="_blank" rel="noreferrer" onClick={e => { if (openExternal) { e.preventDefault(); openExternal(p.url!) } }}>Open product page ↗</a>}
           </div>

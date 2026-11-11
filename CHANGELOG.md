@@ -171,3 +171,5 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
   - Store survey (`scripts/survey-stores.py`): 58 pages; ten shops read fully.
   - Backend product and shortlist routes run their page reads off the event loop.
     201 tests.
+- 2026-11-10 (night): six new screenshots (furnished to a budget, a real product,
+  blocked door, over budget, plan view, light theme) and a new banner.

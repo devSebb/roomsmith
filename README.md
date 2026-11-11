@@ -12,11 +12,19 @@ price against your budget, and shows the piece at true size.
 
 **Status: 0.1.0 — built for the [Hermes Agent Plugin Hackathon](https://x.com/NousResearch/status/2118094256438936062) (Nous Research, 4–11 November 2026); see [Hackathon](#hackathon) below.**
 
-![The Roomsmith page in Hermes Desktop: a room built from a photo — French doors on the back wall, a futon along the right wall, warnings on the objects that clip the door's clear zone](docs/screenshots/desktop-page.png)
+![A bedroom furnished with five real products for USD 680.96 against a USD 1,000 budget: the editor's budget bar, each product's price and footprint in the list, and the pieces at true size in the room](docs/screenshots/01-furnished-to-budget.png)
 
-*Hermes read a photo and built this room; the editor opened it the moment the tool finished (below, as the pane beside the chat).*
+*Five real products, read from their shop pages, placed at true size. The budget bar is exact; the room above came to USD 680.96 of 1,000.*
 
-![The Roomsmith pane next to the Hermes chat, with the toast "Hermes opened Studio (from photo)"](docs/screenshots/desktop-pane-follow.png)
+| | |
+|---|---|
+| ![A product selected: its page's title, price, printed size and link](docs/screenshots/02-real-product.png) | ![A chair dragged into the doorway: the Issues tab says it blocks the door and narrows the walkway](docs/screenshots/03-blocks-the-door.png) |
+| A real product: title, price, printed size and link, read from the page | Drag a chair into the doorway and it says so, with the numbers |
+| ![The budget lowered to 600: the bar turns red and reads USD 80.96 over](docs/screenshots/04-over-budget.png) | ![Plan view with wall lengths](docs/screenshots/05-plan-view.png) |
+| Over budget is shown, never blocked: the decision is yours | Plan view with wall lengths |
+
+The editor is the same in the Hermes Desktop pane, the Desktop full page and the
+`hermes dashboard` tab, in dark and [light](docs/screenshots/06-light-theme.png) themes.
 
 ## What it does
 

@@ -17,8 +17,12 @@ platforms: [macos, linux]
 docs_url: https://github.com/devSebb/roomsmith#readme
 image: "https://raw.githubusercontent.com/devSebb/roomsmith/<SHA>/docs/banner.png"
 screenshots:
-  - "https://raw.githubusercontent.com/devSebb/roomsmith/<SHA>/docs/screenshots/desktop-page.png"
-  - "https://raw.githubusercontent.com/devSebb/roomsmith/<SHA>/docs/screenshots/desktop-pane-follow.png"
+  - "https://raw.githubusercontent.com/devSebb/roomsmith/<SHA>/docs/screenshots/01-furnished-to-budget.png"
+  - "https://raw.githubusercontent.com/devSebb/roomsmith/<SHA>/docs/screenshots/02-real-product.png"
+  - "https://raw.githubusercontent.com/devSebb/roomsmith/<SHA>/docs/screenshots/03-blocks-the-door.png"
+  - "https://raw.githubusercontent.com/devSebb/roomsmith/<SHA>/docs/screenshots/04-over-budget.png"
+  - "https://raw.githubusercontent.com/devSebb/roomsmith/<SHA>/docs/screenshots/05-plan-view.png"
+  - "https://raw.githubusercontent.com/devSebb/roomsmith/<SHA>/docs/screenshots/06-light-theme.png"
 readme: true
 known_issues:
   - "Sizes read from a photo are estimates until you set one real measurement (a wall, the door, or an object)."
