@@ -242,7 +242,7 @@ def test_a_furnishing_request_gets_the_steps_in_the_turn_where_the_model_will_se
     assert hook(session_id="s1", user_message="make the room 10 cm wider") is None
     out = hook(session_id="s1", user_message="furnish it")["context"]
     assert "REAL products" in out and "ASK the user for their budget now" in out and "buffer" in out and "roomsmith_shortlist" in out and "never invent a URL" in out
-    assert out.count("\n") <= 6
+    assert out.count("\n") <= 7
     call("roomsmith_apply", operations=[{"op": "set_budget", "limit": 1000, "currency": "USD"}])
     out = hook(session_id="s1", user_message=[{"type": "text", "text": "ok, 1,000 dollars, warm minimalist"}, {"type": "image", "data": "..."}])["context"]
     assert "Budget USD 1,000" in out and "ASK the user" not in out

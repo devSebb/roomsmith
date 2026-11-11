@@ -27,7 +27,7 @@ readme: true
 known_issues:
   - "Sizes read from a photo are estimates until you set one real measurement (a wall, the door, or an object)."
   - "iPhone HEIC photos must be exported as JPEG/PNG first."
-  - "In Hermes Desktop, the full-page editor appears after an app restart; the side pane is available immediately."
+  - "Furnishing with real products depends on the shops: some refuse automated reads or print no size; the plugin says so and never invents a size or price."
 capabilities:
   provides_tools:
     - roomsmith_projects

@@ -78,12 +78,13 @@ From Hermes Desktop you can also use
 
 Then, depending on where you talk to Hermes:
 
-- **Hermes Desktop:** *Settings → Plugins* lists two entries, **Roomsmith · on disk**
-  (the editor) and **roomsmith** (the agent plugin). Switch the editor on: a
+- **Hermes Desktop:** switch Roomsmith's editor on under *Settings → Plugins*. A
   **Roomsmith** entry appears in the sidebar, the room pane opens beside the chat,
-  and a 🛋 chip in the status bar shows the active room. The full-page editor
-  (sidebar entry / `⌘K` → *Open Roomsmith*) appears after the next app restart —
-  Desktop registers pages at start-up.
+  and a 🛋 chip in the status bar shows the active room. If the full-page editor
+  (sidebar entry / `⌘K` → *Open Roomsmith*) does not appear at once, restart the
+  app: on Desktop 0.21 pages were registered at start-up. When Desktop talks to a
+  remote gateway, the plugin must also be installed on the machine running
+  Desktop, because the editor loads from there.
 - **CLI / `hermes dashboard`:** the tools work in any chat (`-t roomsmith` if you
   pin toolsets); the dashboard shows a **Roomsmith** tab with the same editor.
 
@@ -196,23 +197,38 @@ the room facing that wall.
   which fallback it took and asks for the room's measurements.
 - HEIC photos are not read yet; export as JPEG/PNG first.
 - Rooms are polygons in the data model but the editor resizes rectangles only.
-- Product pages: the plugin reads structured data (schema.org Product, Shopify
-  product JSON, OpenGraph), the visible text and the spec text modern stores keep
-  in inline scripts. Read correctly live (size, price, photo; 10 Nov 2026):
-  VASAGLE/SONGMICS, Nathan James, Brightech, Simpli Home, Walker Edison, Branch,
-  Castlery, Poly & Bark, Sixpenny, Albany Park. A few pages read a wrong size or
-  the default variant's price; check the stand-in's size and price against the
-  page before you buy (`scripts/survey-stores.py` prints what the plugin reads
-  from any list of links). Sites behind bot checks (Article, Wayfair-style
-  WAFs, rate limiters) return an error that says so and Hermes asks you for the
-  printed size. The plugin never invents a size; when a page prints only a
-  footprint (desk tops) the category's usual height is used and said.
+- **Which shops work.** Any product link can be tried; what the plugin gets
+  depends on what the page prints and whether the shop answers. It reads
+  structured data (schema.org Product, Shopify product JSON, OpenGraph), the
+  visible text and the spec text modern stores keep in inline scripts. As of 10
+  November 2026:
+  - *Size, price and photo read:* VASAGLE/SONGMICS, Nathan James, Brightech,
+    Simpli Home, Walker Edison, Branch, Castlery, Poly & Bark, Sixpenny, Albany
+    Park, English Elm, Amber Harlow, Zinus.
+  - *IKEA:* name and price always; the size when it is printed in the product
+    name or the measurements (nightstands, dressers, many beds). Where a bed
+    page gives only a mattress size ("Queen"), the standard size is offered as a
+    marked estimate.
+  - *Amazon:* often no readable price. *Target:* no readable size.
+  - *Refuse automated reads:* Lowe's, Home Depot, Article, Wayfair.
+  - A shop can also refuse one machine and answer another: in testing, one
+    network was refused by every Shopify store (HTTP 429) while another read the
+    same pages. The plugin reports `blocked`, does not retry, and Hermes asks
+    you for the size and price or tries another shop.
+
+  A few pages read a wrong size or the default variant's price. Check the
+  stand-in's size and price against the page before you buy;
+  `scripts/survey-stores.py` prints what the plugin reads from any list of
+  links. The plugin never invents a size: a size that cannot belong to that kind
+  of furniture is rejected, and when a page prints only a footprint (desk tops)
+  the category's usual height is used and said.
 - Furnishing to a budget needs a web search tool in your Hermes for finding
   products; without one, paste a few links per piece. Prices are as read at that
   moment. There is no currency conversion.
-- Hermes Desktop: the full-page editor needs one app restart after enabling; the
-  Desktop's own right-click menu owns right-click on the canvas (pan with ⇧-drag
-  or the middle button).
+- The furniture is drawn as simple stand-in shapes at true size, not as models of
+  the actual products.
+- Hermes Desktop: the Desktop's own right-click menu owns right-click on the
+  canvas (pan with ⇧-drag or the middle button).
 
 ## Hackathon
 
