@@ -2,8 +2,10 @@
 // plan view, agent edit shows up, conflict recovery. Screenshots in .scratch/shots/.
 import { mkdirSync } from 'node:fs'
 
-const OUT = '.scratch/shots'
-const API = 'http://127.0.0.1:8765/api/plugins/roomsmith'
+const PORT = process.env.SMOKE_PORT || '8765'
+const OUT = process.env.OUT || '.scratch/shots'
+const DEV = `http://127.0.0.1:${PORT}`
+const API = `${DEV}/api/plugins/roomsmith`
 const assert = (c, m) => { if (!c) throw new Error('ASSERT: ' + m) }
 const head = async pid => (await (await fetch(`${API}/projects/${pid}/head`)).json())
 
@@ -62,8 +64,8 @@ export default async function (page) {
   assert(plant.position_m[0] <= 4.2 - 0.25 + 1e-6, 'plant kept inside the room: x=' + plant.position_m[0])
   await page.key('v')
 
-  // an "agent" edit through the API must appear in the editor (long-poll) with a toast
-  const r = await fetch(`${API}/projects/${pid}/commands`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actor: 'agent', operations: [{ op: 'add_object', name: 'Reading chair', category: 'armchair', place: { in_corner: ['w1', 'w4'] } }] }) })
+  // an edit by the agent (made out of band, the way its tools make it) must appear in the editor (long-poll) with a toast
+  const r = await fetch(`${DEV}/dev/agent/${pid}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ operations: [{ op: 'add_object', name: 'Reading chair', category: 'armchair', place: { in_corner: ['w1', 'w4'] } }] }) })
   const nBefore = (await state()).objects
   const rj = await r.json()
   assert(rj.ok, 'agent add ok ' + JSON.stringify(rj.error))
@@ -75,7 +77,7 @@ export default async function (page) {
   await page.shot(`${OUT}/04-agent-edit.png`)
 
   // conflict recovery: the editor holds revision N; the API moves on; a UI edit still lands
-  await fetch(`${API}/projects/${pid}/commands`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actor: 'agent', operations: [{ op: 'set_room_height', height_m: 2.7 }] }) })
+  await fetch(`${DEV}/dev/agent/${pid}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ operations: [{ op: 'set_room_height', height_m: 2.7 }] }) })
   const before = await head(pid)
   await page.eval(`window.__rs.store.apply([{ op: 'update_object', id: 'ob1', name: 'Blue sofa' }])`)
   await page.sleep(600)

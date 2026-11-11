@@ -139,7 +139,7 @@ PHRASES = {
     "tv stand": "tv_stand", "tv console": "tv_stand", "tv cabinet": "tv_stand", "media stand": "tv_stand", "entertainment center": "tv_stand",
     "area rug": "rug", "wall art": "picture", "art print": "picture", "canvas print": "picture", "framed print": "picture", "poster": "picture",
     "floor mirror": "mirror", "wall mirror": "mirror", "book shelf": "bookshelf", "ladder shelf": "bookshelf", "ladder bookshelf": "bookshelf",
-    "storage organizer": "bookshelf", "cube organizer": "bookshelf", "cube storage": "bookshelf",
+    "drawer unit": "dresser", "storage unit": "cabinet", "filing cabinet": "cabinet", "storage organizer": "bookshelf", "cube organizer": "bookshelf", "cube storage": "bookshelf",
     "desk chair": "chair", "task chair": "chair", "accent chair": "armchair", "arm chair": "armchair", "club chair": "armchair", "wingback": "armchair",
     "bar stool": "stool", "counter stool": "stool", "storage bench": "bench", "nesting table": "table_coffee", "console table": "table_side",
     "writing desk": "desk", "standing desk": "desk", "computer desk": "desk", "uplighter": "lamp_floor", "torchiere": "lamp_floor",

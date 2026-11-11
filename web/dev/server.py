@@ -38,6 +38,12 @@ def main() -> None:
     app.include_router(mod.router, prefix="/api/plugins/roomsmith")
     dev = ROOT / "web" / "dev"
 
+    @app.post("/dev/agent/{project_id}")
+    async def agent_command(project_id: str, body: dict):
+        """Harness only: an edit made the way the agent's tools make it (actor "agent"), from another caller
+        than the editor. The plugin's own API always records its caller as the user."""
+        return mod._svc().apply({"project_id": project_id, "actor": "agent", "operations": body.get("operations")})
+
     @app.get("/")
     async def index():
         return FileResponse(dev / "index.html")
