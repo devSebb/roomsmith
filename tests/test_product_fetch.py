@@ -171,3 +171,42 @@ def test_product_color_is_the_photo_s_dominant_colour():
     url = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
     assert product_color(url) == "#c1bdb4"
     assert product_color("data:image/png;base64,AAAA") is None
+
+
+def test_fractional_inches_are_read(tmp_path):
+    from rs_core import dims
+
+    assert dims.unfraction('18 7/8x15 3/8x24 3/8 "') == '18.875x15.375x24.375 "'
+    assert dims.unfraction("3/4 in, 1-1/2 in, 11/10/2026, 7/0") == "0.75 in, 1.5 in, 11/10/2026, 7/0"
+    n = dims.parse_dimensions('18 7/8x15 3/8x24 3/8 "', category="nightstand")
+    assert [round(n[k], 2) for k in ("width_m", "depth_m", "height_m")] == [0.48, 0.39, 0.62]
+    b = dims.parse_dimensions('Length: 82 1/4 "; Width: 63 "; Headboard height: 36 1/4 "', category="bed_queen")
+    assert [round(b[k], 2) for k in ("width_m", "depth_m", "height_m")] == [1.6, 2.09, 0.92]
+
+
+def test_a_size_in_the_product_name_wins_over_a_number_triple_in_a_review():
+    """Found live on an IKEA page: the size was in the name, and '8 x 8 x 2' from a
+    customer review was read as the product's size and reported as verified."""
+    ld = {"@type": "Product", "name": 'TARVA Nightstand - pine 18 7/8x15 3/8x24 3/8 "', "offers": {"@type": "Offer", "price": "79.99", "priceCurrency": "USD"}}
+    body = ("<html><head><script type='application/ld+json'>" + json.dumps(ld) + "</script></head><body><p>I bought 4 of these. Each box was 8 x 8 x 2 inches of screws.</p></body></html>").encode()
+    r = pf.fetch_product("https://shop.example.com/p/tarva", category="nightstand", _get=lambda *a, **k: (body, "text/html", "https://shop.example.com/p/tarva"))
+    assert r["ok"] and [round(v, 2) for v in r["dimensions_m"]] == [0.48, 0.62, 0.39]
+    review_only = ("<html><head><script type='application/ld+json'>" + json.dumps({**ld, "name": "TARVA Nightstand"}) + "</script></head><body><p>Dimensions of the bag of screws: 8 x 8 x 2 inches.</p></body></html>").encode()
+    r = pf.fetch_product("https://shop.example.com/p/tarva2", category="nightstand", _get=lambda *a, **k: (review_only, "text/html", "https://shop.example.com/p/tarva2"))
+    assert r["ok"] and r["dimensions_m"] is None  # implausible for a nightstand: say there is no size, never a wrong one
+
+
+def test_offers_shaped_as_lists_and_pages_that_break_the_reader_do_not_raise():
+    """Found live: schema.org priceSpecification as a list raised AttributeError through the tool."""
+    ld = {"@type": "Product", "name": "Bed", "description": "W 160 cm x D 200 cm x H 90 cm", "offers": [{"@type": "Offer", "priceSpecification": [{"price": "199", "priceCurrency": "USD"}]}]}
+    body = ("<script type='application/ld+json'>" + json.dumps(ld) + "</script>").encode()
+    r = pf.fetch_product("https://shop.example.com/p/bed", category="bed_queen", _get=lambda *a, **k: (body, "text/html", "https://shop.example.com/p/bed"))
+    assert r["ok"] and r["price"] == "USD 199" and r["dimensions_m"]
+    weird = ("<script type='application/ld+json'>" + json.dumps({"@type": "Product", "name": "X", "offers": {"price": {"oops": 1}, "priceSpecification": 7}}) + "</script>").encode()
+    assert pf.fetch_product("https://shop.example.com/p/x", _get=lambda *a, **k: (weird, "text/html", "u"))["ok"] in (True, False)
+
+    def boom(*a, **k):
+        raise RuntimeError("anything")
+
+    r = pf.fetch_product("https://shop.example.com/p/y", _get=boom)
+    assert r["ok"] is False and r["error"]["code"] == "unreadable" and "RuntimeError" in r["error"]["message"]

@@ -22,7 +22,7 @@ def page(title, price, dims):
 PAGES = {
     "small-desk": page("Small Desk", "199.00", "W 100 cm x D 50 cm x H 75 cm"),
     "big-desk": page("Big Desk", "249.00", "W 160 cm x D 70 cm x H 75 cm"),
-    "huge-desk": page("Huge Desk", "99.00", "W 600 cm x D 90 cm x H 75 cm"),
+    "huge-desk": page("Huge Desk", "99.00", "W 450 cm x D 90 cm x H 75 cm"),
     "gold-desk": page("Gold Desk", "2500.00", "W 110 cm x D 55 cm x H 75 cm"),
     "mystery-desk": page("Mystery Desk", "150.00", None),
     "free-desk": page("Unpriced Desk", None, "W 100 cm x D 50 cm x H 75 cm"),

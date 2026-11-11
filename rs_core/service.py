@@ -552,7 +552,10 @@ class RoomService:
             "candidates": rows,
             "recommended": best["rank"] if best else None,
             "text": "\n".join(f"{r['rank']}. {r.get('title') or r.get('url') or 'candidate'} — {r['why']}" for r in rows),
-            "next": "Nothing was added. Add the one the user wants with roomsmith_add_product {url, place}." + ("" if best else " None is both verified and a clean fit inside the budget: tell the user what the table says and ask."),
+            "next": "Nothing was added. Add the one the user wants with roomsmith_add_product {url, category, place}."
+            + ("" if best else " None is both read from its page and a clean fit inside the budget: tell the user what the table says and ask.")
+            + (" A row marked verified false has a size the plugin did not read. You may still add it with roomsmith_add_product {url, title, dimensions_text, price, category, place} if you tell the user where its size came from (your search result, or them) and that the plugin did not check it." if any(not r["verified"] and r["status"] in ("ok", "uses_reserve", "no_price") for r in rows) else "")
+            + (" Rows with no_dimensions: the page prints no size the plugin can read (beds are often sold by mattress size). Try another product or shop before asking the user." if any(r["status"] == "no_dimensions" for r in rows) else ""),
         }
         if status:
             out["budget"] = {k: status[k] for k in ("limit", "currency", "reserve", "spent", "remaining", "remaining_spendable", "text")}

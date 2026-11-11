@@ -117,12 +117,17 @@ going over is the user's decision.
    your search returned or the user gave. Never construct or guess a URL.**
    Shops whose pages read well (size and price): songmics.com (VASAGLE),
    nathanjames.com, brightech.com, simpli-home.com, walkeredison.com,
-   branchfurniture.com, castlery.com, polyandbark.com. Big marketplaces
-   (Amazon, IKEA, Wayfair, Article) refuse automated reads.
+   branchfurniture.com, castlery.com, polyandbark.com. IKEA pages give title
+   and price, and the size when it is in the product name (nightstands,
+   tables), but not for beds, which are sold by mattress size. Amazon,
+   Wayfair and Article refuse automated reads. If a shop's rows come back
+   `no_dimensions` or `blocked`, switch shop; do not retry it.
 4. `roomsmith_shortlist {category, candidates: [{url}, …], place?}`. The plugin
    reads each page, tests the size in the room, checks the door and the budget,
    and ranks. Read the `why` of each row. Rows with `verified: false` are not
-   page data; never present them as checked.
+   page data; never present them as checked. You may still add one (with
+   `title`, `dimensions_text`, `price`) if you tell the user where its size
+   came from and that the plugin did not read it.
 5. Add the one you chose with `roomsmith_add_product {url, category, place}`
    (use the row's `place`). If the reply has a `budget_note` (the room is now
    over, or into the user's buffer, or the price is unknown), **say so in that

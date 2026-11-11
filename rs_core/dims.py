@@ -146,9 +146,44 @@ def orient_for_category(parsed: dict[str, Any] | None, category: str | None) -> 
     return parsed
 
 
+_MIXED = re.compile(r"(?<![\d./])(\d+)[\s\u00a0-]+(\d{1,2})\s*/\s*(\d{1,2})(?![\d/])")
+_FRACTION = re.compile(r"(?<![\d./])(\d{1,2})\s*/\s*(\d{1,2})(?![\d/])")
+
+
+def unfraction(text: str) -> str:
+    """'18 7/8' -> '18.875', '3/4' -> '0.75': inch sizes are often printed as fractions."""
+
+    def mixed(m: re.Match) -> str:
+        den = int(m.group(3))
+        return m.group(0) if den == 0 else f"{int(m.group(1)) + int(m.group(2)) / den:.4f}".rstrip("0").rstrip(".")
+
+    def plain(m: re.Match) -> str:
+        den = int(m.group(2))
+        return m.group(0) if den == 0 or int(m.group(1)) >= den else f"{int(m.group(1)) / den:.4f}".rstrip("0").rstrip(".")
+
+    return _FRACTION.sub(plain, _MIXED.sub(mixed, text))
+
+
+def plausible(parsed: dict[str, Any] | None, category: str | None) -> bool:
+    """False when a parsed size cannot belong to this category (a third of its smallest
+    usual size, or over twice its largest). Unknown categories are not judged."""
+    if not parsed or not category:
+        return True
+    from rs_core.catalog import CATALOG
+
+    spec = CATALOG.get(category)
+    if spec is None or category in ("box", "other"):
+        return True
+    got = (parsed.get("width_m") or 0.0, parsed.get("height_m") or 0.0, parsed.get("depth_m") or 0.0)
+    for value, lo, hi in zip(got, spec.min, spec.max):
+        if value and not (lo * 0.33 <= value <= hi * 2.0):
+            return False
+    return True
+
+
 def parse_dimensions(text: str | None, default_unit: str | None = None, category: str | None = None) -> dict[str, Any] | None:
     """Read printed dimensions and turn them to Roomsmith's width/height/depth."""
-    return orient_for_category(_parse_dimensions(text, default_unit, category), category)
+    return orient_for_category(_parse_dimensions(unfraction(text) if text else text, default_unit, category), category)
 
 
 def _parse_dimensions(text: str | None, default_unit: str | None = None, category: str | None = None) -> dict[str, Any] | None:

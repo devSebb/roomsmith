@@ -43,7 +43,7 @@ TIMEOUT_S = 12
 _DIM_LINE = re.compile(r"\d+(?:[.,]\d+)?\s*(?:cm|mm|m|in|inch|inches|\"|”|′|'|ft)?\s*[WDHL]?\s*(?:x|×|\*|by)\s*[WDHL]?\s*:?\s*\d", re.I)
 _PRIORITY = re.compile(r"overall|dimension|measure|size", re.I)
 # the box it ships in, not the thing: "Package: 29 x 25 x 15 | 44 lbs", "(1 of 2) - 83” x 13” x 5”"
-_DEMOTE = re.compile(r"packag|box|carton|shipping|ships|parcel|\(\d+ of \d+\)|\blbs?\b|\bkg\b|weight", re.I)
+_DEMOTE = re.compile(r"packag|box|carton|shipping|ships|parcel|\(\d+ of \d+\)|\blbs?\b|\bkg\b|weight|\breviews?\b|\bI (?:bought|ordered|have|love|returned|purchased)\b|\bstars?\b", re.I)
 _SIZE_WORDS = {"bed_single": "twin|single", "bed_double": "full|double", "bed_queen": "queen", "bed_king": "king"}
 MAX_SCRIPT_BYTES = 3 * 1024 * 1024
 
@@ -329,15 +329,24 @@ def _first_str(v: Any) -> str | None:
 
 
 def _price_from_offers(offers: Any) -> str | None:
-    if isinstance(offers, list):
-        offers = offers[0] if offers else None
-    if not isinstance(offers, dict):
+    offers = _first_dict(offers)
+    if offers is None:
         return None
-    price = offers.get("price") or offers.get("lowPrice") or (offers.get("priceSpecification") or {}).get("price")
-    cur = offers.get("priceCurrency") or (offers.get("priceSpecification") or {}).get("priceCurrency") or ""
+    spec = _first_dict(offers.get("priceSpecification")) or {}  # schema.org allows one, or a list of them
+    price = offers.get("price") or offers.get("lowPrice") or spec.get("price")
+    cur = offers.get("priceCurrency") or spec.get("priceCurrency") or ""
+    if isinstance(price, (dict, list)) or isinstance(cur, (dict, list)):
+        return None
     if price is None:
         return None
     return f"{cur} {price}".strip()
+
+
+def _first_dict(v: Any) -> dict | None:
+    """schema.org values come as one object or a list of them."""
+    if isinstance(v, list):
+        v = next((x for x in v if isinstance(x, dict)), None)
+    return v if isinstance(v, dict) else None
 
 
 def _qv(v: Any) -> str | None:
@@ -447,6 +456,8 @@ def find_dimensions(texts: list[str], category: str | None = None) -> dict | Non
     partial_fallback: dict | None = None
     for _, _, line in candidates:
         parsed = dims_mod.parse_dimensions(line, category=category)
+        if parsed and not dims_mod.plausible(parsed, category):
+            continue  # a number triple that cannot be this kind of thing: a review, a part, a box
         if parsed and not parsed.get("partial"):
             parsed["dimensions_text"] = line[:200]
             return parsed
@@ -457,7 +468,7 @@ def find_dimensions(texts: list[str], category: str | None = None) -> dict | Non
     for text in texts:
         joined = ", ".join(l for l in _lines(text) if re.search(r"\b(width|depth|height|length|w|d|h)\b", l, re.I) and re.search(r"\d", l))
         parsed = dims_mod.parse_dimensions(joined, category=category) if joined else None
-        if parsed and not parsed.get("partial"):
+        if parsed and not parsed.get("partial") and dims_mod.plausible(parsed, category):
             parsed["dimensions_text"] = joined[:200]
             return parsed
     if partial_fallback is not None:
@@ -484,11 +495,19 @@ def _looks_like_challenge(body: bytes) -> bool:
 
 
 def fetch_product(url: str, category: str | None = None, _get=http_get) -> dict:
-    """Read one product page. Never raises for site problems: returns ok False with a code."""
+    """Read one product page. Never raises: a site problem or a page shaped in a way
+    this reader did not expect comes back as ok False with a code."""
     try:
         url = check_url(url)
     except FetchError as e:
         return {"ok": False, "url": url, "error": {"code": e.code, "message": e.message}}
+    try:
+        return _read_page(url, category, _get)
+    except Exception as e:  # noqa: BLE001 - product pages are arbitrary; one odd page must not fail the call
+        return {"ok": False, "url": url, "error": {"code": "unreadable", "message": f"The page could not be read ({type(e).__name__}). Ask the user for the size and price printed on it."}}
+
+
+def _read_page(url: str, category: str | None, _get) -> dict:
 
     notes: list[str] = []
     found: dict | None = None
@@ -524,7 +543,8 @@ def fetch_product(url: str, category: str | None = None, _get=http_get) -> dict:
     else:
         for k in ("title", "image_url", "price"):
             found[k] = found.get(k) or meta.get(k)
-    texts = list(found.get("texts") or []) + [meta["texts"][0], "\n".join(page.text), _script_lines(page.scripts)]
+    # the product's own name first: some shops print the size there ("Nightstand 18 7/8x15 3/8x24 3/8")
+    texts = [str(found.get("title") or "")] + list(found.get("texts") or []) + [meta["texts"][0], "\n".join(page.text), _script_lines(page.scripts)]
     parsed = find_dimensions([t for t in texts if t], category=category)
 
     out: dict[str, Any] = {

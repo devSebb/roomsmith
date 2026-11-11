@@ -193,3 +193,15 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
   is set; the tool labels point furnishing at `roomsmith_shortlist`. A size the
   agent chose for a generic piece is recorded as an estimate (`dims_source`),
   not as stated. 205 tests.
+- 2026-11-10 (after the first live furnishing turn, on IKEA pages):
+  - schema.org `priceSpecification` given as a list raised `AttributeError` through
+    `roomsmith_shortlist`. Fixed, and the page reader now turns any unexpected
+    page shape into an `unreadable` result, never an exception.
+  - Fractional inches are read (`18 7/8x15 3/8x24 3/8 "`, `82 1/4 "`).
+  - A size printed in the product's name is read first.
+  - A parsed size that cannot belong to the category (found: "8 x 8 x 2" from a
+    customer review, reported as a nightstand's verified size) is rejected: the
+    plugin says "no size" and never a wrong one. Review-like lines are demoted.
+  - The shortlist's reply and the furnishing brief say what to do when rows come
+    back `no_dimensions` or unverified, so the agent switches shop and does not stall.
+    208 tests.
