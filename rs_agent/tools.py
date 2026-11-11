@@ -212,6 +212,20 @@ def read_product(args: dict, kwargs: dict) -> dict:
 
 
 @_guard
+def shortlist(args: dict, kwargs: dict) -> dict:
+    svc = get_service()
+    candidates = _operations(args.get("candidates"))  # a JSON string or a single object is accepted too
+    return svc.shortlist(
+        args.get("project_id"),
+        category=str(args.get("category") or ""),
+        candidates=candidates,
+        place=_obj(args.get("place")),
+        replace_object_id=args.get("replace_object_id"),
+        max_price=args.get("max_price"),
+    )
+
+
+@_guard
 def history(args: dict, kwargs: dict) -> dict:
     svc = get_service()
     action = str(args.get("action") or "list").lower()

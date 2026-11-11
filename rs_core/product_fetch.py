@@ -17,11 +17,16 @@ when no dimensions are printed, ``dims`` is None and the caller asks the user.
 
 from __future__ import annotations
 
+import hashlib
 import html
 import ipaddress
 import json
 import re
 import socket
+import threading
+import time
+import unicodedata
+from pathlib import Path
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -43,6 +48,16 @@ _SIZE_WORDS = {"bed_single": "twin|single", "bed_double": "full|double", "bed_qu
 MAX_SCRIPT_BYTES = 3 * 1024 * 1024
 
 
+# Outbound requests are bounded per process: a furnishing session reads many pages,
+# and a shop must never see a burst from one user's plugin.
+MAX_REQUESTS_PER_WINDOW = 80
+WINDOW_S = 600.0
+MAX_PER_HOST_PER_MINUTE = 12  # a product read is one or two requests
+CACHE_OK_S = 24 * 3600.0
+CACHE_BLOCKED_S = 30 * 60.0
+CACHE_MAX_FILES = 300
+
+
 class FetchError(Exception):
     def __init__(self, code: str, message: str):
         super().__init__(message)
@@ -50,6 +65,45 @@ class FetchError(Exception):
 
 
 # ------------------------------------------------------------------ HTTP
+
+
+class RateLimit:
+    """Sliding-window cap on outbound requests (all hosts, and per host)."""
+
+    def __init__(self, clock=time.monotonic) -> None:
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._all: list[float] = []
+        self._hosts: dict[str, list[float]] = {}
+
+    def take(self, host: str) -> None:
+        now = self._clock()
+        with self._lock:
+            self._all = [t for t in self._all if now - t < WINDOW_S]
+            mine = [t for t in self._hosts.get(host, []) if now - t < 60.0]
+            if len(self._all) >= MAX_REQUESTS_PER_WINDOW or len(mine) >= MAX_PER_HOST_PER_MINUTE:
+                raise FetchError("rate_limited", "Roomsmith has read many pages in the last few minutes. Wait a little, or give the size and price printed on the page.")
+            self._all.append(now)
+            mine.append(now)
+            self._hosts[host] = mine
+            if len(self._hosts) > 200:
+                self._hosts = {h: ts for h, ts in self._hosts.items() if ts and now - ts[-1] < 60.0}
+
+
+RATE_LIMIT = RateLimit()
+
+_TAG = re.compile(r"<[^>]{0,200}>")
+
+
+def clean_text(value: Any, limit: int) -> str | None:
+    """A short string from a web page, safe to hand to the model: tags, control and
+    invisible characters removed, whitespace collapsed, length capped."""
+    if value is None:
+        return None
+    text = _TAG.sub(" ", html.unescape(str(value)))
+    text = "".join(ch if unicodedata.category(ch)[0] != "C" else " " for ch in text)
+    text = " ".join(text.split())
+    return text[:limit].rstrip() or None
 
 
 def _public_ip(text: str) -> bool:
@@ -127,6 +181,7 @@ def http_get(url: str, timeout: float = TIMEOUT_S, accept: str = "text/html,appl
     The host (and the host of every redirect) must resolve to public addresses only;
     the body is capped at MAX_BYTES before and after decompression."""
     _assert_public(url)
+    RATE_LIMIT.take((urllib.parse.urlparse(url).hostname or "").lower())
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": accept, "Accept-Language": "en", "Accept-Encoding": "gzip"})
     try:
         with _OPENER.open(req, timeout=timeout) as resp:
@@ -475,14 +530,14 @@ def fetch_product(url: str, category: str | None = None, _get=http_get) -> dict:
     out: dict[str, Any] = {
         "ok": True,
         "url": final_url,
-        "title": (found.get("title") or "").strip()[:120] or None,
-        "price": found.get("price"),
+        "title": clean_text(found.get("title"), 120),
+        "price": clean_text(found.get("price"), 40),
         "image_url": found.get("image_url"),
         "source": found.get("source"),
         "notes": notes,
     }
     if parsed:
-        out["dimensions_text"] = parsed.pop("dimensions_text")
+        out["dimensions_text"] = clean_text(parsed.pop("dimensions_text"), 160)
         out["dimensions_m"] = [parsed["width_m"], parsed["height_m"], parsed["depth_m"]]
         out["dims"] = parsed
         if parsed.get("height_assumed"):
@@ -491,4 +546,38 @@ def fetch_product(url: str, category: str | None = None, _get=http_get) -> dict:
         out["dims"] = None
         out["dimensions_m"] = None
         out["notes"].append("No readable dimensions on the page. Ask the user for the printed size.")
+    return out
+
+
+# ------------------------------------------------------------------ cache
+
+
+def read_cached(url: str, category: str | None, cache_dir: Path, _get=http_get, now=time.time) -> dict:
+    """``fetch_product`` with a small on-disk cache of results (never page bodies).
+
+    A page that read is reused for a day; a site that refused is not asked again
+    for half an hour; other failures are not cached."""
+    key = hashlib.sha256(f"{(url or '').strip()}|{category or ''}".encode()).hexdigest()[:24]
+    folder = Path(cache_dir) / "pages"
+    path = folder / f"{key}.json"
+    try:
+        saved = json.loads(path.read_text())
+        age = now() - float(saved["fetched_at"])
+        blocked = not saved.get("ok") and (saved.get("error") or {}).get("code") == "blocked"
+        if 0 <= age < (CACHE_BLOCKED_S if blocked else CACHE_OK_S) and (saved.get("ok") or blocked):
+            return {**saved, "cached": True}
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    out = fetch_product(url, category=category) if _get is http_get else fetch_product(url, category=category, _get=_get)
+    out["fetched_at"] = now()
+    out["cached"] = False
+    if out.get("ok") or (out.get("error") or {}).get("code") == "blocked":
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(out))
+            files = sorted(folder.glob("*.json"), key=lambda f: f.stat().st_mtime)
+            for old in files[: max(0, len(files) - CACHE_MAX_FILES)]:
+                old.unlink(missing_ok=True)
+        except OSError:
+            pass  # a cache that cannot be written is not an error
     return out

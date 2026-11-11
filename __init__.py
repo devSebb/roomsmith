@@ -52,6 +52,7 @@ def register(ctx) -> None:
         "roomsmith_apply": tools.apply,
         "roomsmith_check": tools.check,
         "roomsmith_read_product": tools.read_product,
+        "roomsmith_shortlist": tools.shortlist,
         "roomsmith_add_product": tools.add_product,
         "roomsmith_history": tools.history,
         "roomsmith_export": tools.export,

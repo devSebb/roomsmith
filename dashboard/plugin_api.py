@@ -178,11 +178,34 @@ async def check(project_id: str, request: Request):
     )
 
 
-@router.post("/projects/{project_id}/products")
-async def add_product(project_id: str, request: Request):
+@router.post("/projects/{project_id}/shortlist")
+async def shortlist(project_id: str, request: Request):
+    """Compare products for one spot. The page reads are blocking, so they run off the event loop."""
+    import asyncio
+
     body = await _json_body(request)
     return _reply(
-        _svc().add_product(
+        await asyncio.to_thread(
+            _svc().shortlist,
+            project_id,
+            str(body.get("category") or ""),
+            body.get("candidates"),
+            body.get("place") if isinstance(body.get("place"), dict) else None,
+            body.get("replace_object_id"),
+            body.get("max_price"),
+        )
+    )
+
+
+@router.post("/projects/{project_id}/products")
+async def add_product(project_id: str, request: Request):
+    """Add a product. With only a link the service reads the page, so this runs off the event loop."""
+    import asyncio
+
+    body = await _json_body(request)
+
+    def work() -> dict:
+        return _svc().add_product(
             project_id,
             title=str(body.get("title") or ""),
             dimensions_text=body.get("dimensions_text"),
@@ -197,7 +220,8 @@ async def add_product(project_id: str, request: Request):
             actor="user",
             command_id=body.get("command_id") or new_command_id(),
         )
-    )
+
+    return _reply(await asyncio.to_thread(work))
 
 
 # ------------------------------------------------------------------ photos

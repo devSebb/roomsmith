@@ -115,7 +115,43 @@ def _guess_unit(values: list[float]) -> str:
 LENGTH_IS_DEPTH = frozenset({"bed", "bed_single", "bed_double", "bed_queen", "bed_king", "crib", "bathtub", "rug", "bench", "mattress"})
 
 
+# Roomsmith's "width" runs along the wall the piece stands against and "depth" comes out
+# into the room. Shops label these every possible way ("24 D x 42 W", "L x W x H"), so
+# when the category makes the answer obvious the reading is turned to match.
+WIDER_THAN_DEEP = {"sofa", "loveseat", "desk", "table_dining", "table_coffee", "bookshelf", "wardrobe", "dresser", "sideboard", "tv_stand", "tv", "bench", "counter"}
+LONGER_THAN_WIDE = {"bed", "bed_single", "bed_double", "bed_queen", "bed_king", "crib", "bathtub"}
+TALLEST_SIDE_IS_HEIGHT = {"lamp_floor"}
+
+
+def orient_for_category(parsed: dict[str, Any] | None, category: str | None) -> dict[str, Any] | None:
+    if not parsed or not category or parsed.get("partial"):
+        return parsed
+    w, h, d = parsed["width_m"], parsed["height_m"], parsed["depth_m"]
+    note = ""
+    if category in TALLEST_SIDE_IS_HEIGHT and h and h < max(w, d):
+        if w >= d:
+            w, h = h, w
+        else:
+            d, h = h, d
+        note = "Took the longest side as the height (a floor lamp stands up)."
+    if category in WIDER_THAN_DEEP and h and d > w * 1.3:  # clearly turned; small cube-like pieces are left as labelled
+        w, d = d, w
+        note = "Took the longer side as the width (along the wall) and the shorter as the depth."
+    elif category in LONGER_THAN_WIDE and w > d * 1.05:
+        w, d = d, w
+        note = "Took the longer side as the length of the bed and the shorter as its width."
+    if note:
+        parsed = {**parsed, "width_m": w, "height_m": h, "depth_m": d, "reoriented": True}
+        parsed["order_note"] = (parsed.get("order_note") + " " if parsed.get("order_note") else "") + note
+    return parsed
+
+
 def parse_dimensions(text: str | None, default_unit: str | None = None, category: str | None = None) -> dict[str, Any] | None:
+    """Read printed dimensions and turn them to Roomsmith's width/height/depth."""
+    return orient_for_category(_parse_dimensions(text, default_unit, category), category)
+
+
+def _parse_dimensions(text: str | None, default_unit: str | None = None, category: str | None = None) -> dict[str, Any] | None:
     """Return parsed dimensions or None when nothing usable is found."""
     if not text or not isinstance(text, str):
         return None

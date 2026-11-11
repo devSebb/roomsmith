@@ -23,6 +23,8 @@ from rs_core.model import SceneError
 from rs_core.store import NotFound, RevisionConflict, Store
 
 ACTORS = ("user", "agent", "system")
+SHORTLIST_MAX = 6
+SHORTLIST_DEADLINE_S = 45.0
 
 
 def _err(code: str, message: str, **extra: Any) -> dict:
@@ -472,12 +474,180 @@ class RoomService:
 
     def read_product(self, url: str, category: str | None = None) -> dict:
         """Read a product page the user pasted: title, price, image, dimensions (if printed)."""
-        out = product_fetch.fetch_product(url, category=normalize_category(category) if category else None)
+        out = product_fetch.read_cached(url, normalize_category(category) if category else None, self.data_dir / "products")
         if out.get("ok") and out.get("dimensions_m"):
             out["text"] = f"{out.get('title') or url}: {out['dimensions_text']} -> {out['dimensions_m'][0]:.2f} x {out['dimensions_m'][1]:.2f} x {out['dimensions_m'][2]:.2f} m (w x h x d)" + (f", {out['price']}" if out.get("price") else "")
         elif out.get("ok"):
             out["text"] = f"{out.get('title') or url}: no printed dimensions found on the page; ask the user for the size."
         return out
+
+    def shortlist(
+        self,
+        project_id: str | None,
+        category: str,
+        candidates: list,
+        place: dict | None = None,
+        replace_object_id: str | None = None,
+        max_price: Any = None,
+        clock=time.monotonic,
+    ) -> dict:
+        """Compare real products for one spot. Reads each page, tests the size in the
+        room, compares the price with the budget, ranks. Writes nothing."""
+        pid = self._resolve_project(project_id)
+        if not pid:
+            return self._no_project(project_id)
+        if not isinstance(candidates, list) or not candidates:
+            return _err("missing_field", "candidates must be a list of 1 to 6 products, each {url} or {title, dimensions_text or dimensions_m, price}")
+        if len(candidates) > SHORTLIST_MAX:
+            return _err("invalid_value", f"At most {SHORTLIST_MAX} candidates per call; send the {SHORTLIST_MAX} most promising.", limit=SHORTLIST_MAX)
+        scene, rev = self.store.get_scene(pid)
+        cat = normalize_category(category) if category else None
+        ignore: list[str] = []
+        if replace_object_id:
+            try:
+                old = m.find_object(scene, replace_object_id)
+            except SceneError as e:
+                return {"ok": False, "error": e.to_dict()}
+            ignore = [old["id"]]
+        status = money.budget_status(scene)
+        cur = status["currency"] if status else None
+        ceiling = money.parse_price(max_price, cur) if max_price is not None else None
+        deadline = clock() + SHORTLIST_DEADLINE_S
+        rows: list[dict] = []
+        seen: dict[str, dict] = {}
+        for index, cand in enumerate(candidates):
+            if isinstance(cand, str):
+                cand = {"url": cand}
+            if not isinstance(cand, dict):
+                rows.append({"index": index, "status": "unreadable", "verified": False, "why": "Not a product: give {url} or {title, dimensions, price}."})
+                continue
+            url = str(cand.get("url") or "").strip() or None
+            if url and url in seen:
+                continue  # the same link twice is one product
+            row = self._shortlist_row(scene, cand, url, cat, place, old if replace_object_id else None, ignore, status, ceiling, clock() > deadline)
+            row["index"] = index
+            if url:
+                seen[url] = row
+            rows.append(row)
+        order = {"ok": 0, "uses_reserve": 1, "no_price": 2}
+
+        def rank_key(r: dict) -> tuple:
+            usable = r["status"] in order
+            # clean fits first, then cheaper, then roomier; everything else keeps the order it was given in
+            return (order.get(r["status"], 3), len(r.get("issues") or []) if usable else 0, (r.get("price_amount") or 0.0) if usable else 0.0, -(r.get("spare_m") or 0.0) if usable else 0.0, r["index"])
+
+        rows.sort(key=rank_key)
+        for rank, row in enumerate(rows, 1):
+            row["rank"] = rank
+        best = next((r for r in rows if r["status"] == "ok" and r["verified"]), None)
+        out = {
+            "ok": True,
+            "project_id": pid,
+            "revision": rev,
+            "category": cat,
+            "candidates": rows,
+            "recommended": best["rank"] if best else None,
+            "text": "\n".join(f"{r['rank']}. {r.get('title') or r.get('url') or 'candidate'} — {r['why']}" for r in rows),
+            "next": "Nothing was added. Add the one the user wants with roomsmith_add_product {url, place}." + ("" if best else " None is both verified and a clean fit inside the budget: tell the user what the table says and ask."),
+        }
+        if status:
+            out["budget"] = {k: status[k] for k in ("limit", "currency", "reserve", "spent", "remaining", "remaining_spendable", "text")}
+        return out
+
+    def _shortlist_row(self, scene: dict, cand: dict, url: str | None, cat: str | None, place: dict | None, old: dict | None, ignore: list[str], status: dict | None, ceiling: tuple | None, out_of_time: bool) -> dict:
+        cur = status["currency"] if status else None
+        row: dict = {"url": url, "title": product_fetch.clean_text(cand.get("title"), 120), "verified": False}
+        if out_of_time:
+            return {**row, "status": "skipped", "why": "Not read: this call ran out of time. Ask again with fewer candidates."}
+        dims, price_text, source = None, cand.get("price"), "stated by you"
+        if url:
+            page = self.read_product(url, category=cat)
+            if page.get("ok"):
+                source = page.get("source") or "page"
+                row["title"] = page.get("title") or row["title"]
+                row["verified"] = bool(page.get("dimensions_m"))
+                dims = page.get("dimensions_m")
+                price_text = page.get("price") or None  # the page's price, or unknown: never the caller's guess
+                if page.get("notes"):
+                    row["notes"] = page["notes"][:2]
+            else:
+                code = (page.get("error") or {}).get("code", "unreadable")
+                row["read_error"] = code
+                if cand.get("dimensions_m") is None and not cand.get("dimensions_text"):
+                    return {**row, "status": "blocked" if code in ("blocked", "rate_limited") else "unreadable", "why": (page.get("error") or {}).get("message", "The page could not be read.")}
+        if dims is None:
+            try:
+                if cand.get("dimensions_m") is not None:
+                    dims = ops.parse_dims(cand["dimensions_m"])
+                elif cand.get("dimensions_text"):
+                    parsed = dims_mod.parse_dimensions(str(cand["dimensions_text"]), category=cat)
+                    if parsed and not parsed.get("partial"):
+                        dims = [parsed["width_m"], parsed["height_m"], parsed["depth_m"]]
+            except SceneError:
+                dims = None
+        row["source"] = source
+        if dims is None:
+            return {**row, "status": "no_dimensions", "why": "No readable size. Ask the user for the size printed on the page."}
+        row["dimensions_m"] = [round(float(v), 3) for v in dims]
+        name = row["title"] or "candidate"
+        spot = place or (_same_spot_as(scene, old, dims) if old else None)
+        if spot:
+            fit = fitcheck.fits_at(scene, dims, spot, name, ignore_ids=ignore)
+            fits = bool(fit.get("fits"))
+            row["issues"] = [i["message"] for i in fit.get("issues", [])]
+            clear = fit.get("clearance_m") or {}
+            fit_text = fit.get("verdict") or fit.get("reason") or ""
+            row["place"] = spot
+        else:
+            found = fitcheck.where_fits(scene, dims, name, max_results=1)
+            fits = bool(found.get("candidates"))
+            best = found["candidates"][0] if fits else {}
+            row["issues"] = list(best.get("warnings") or [])
+            clear = best.get("clearance_m") or {}
+            fit_text = found.get("verdict") or ""
+            if fits:
+                row["place"] = best["place"]
+        row["fits"] = fits
+        if clear:
+            row["clearance_m"] = clear
+            row["spare_m"] = round(min(float(clear.get("left", 0)), float(clear.get("right", 0))), 3)
+        door = fitcheck.passes_door(scene, dims)
+        row["passes_door"] = door.get("passes")
+        price = money.parse_price(price_text, cur)
+        if price:
+            row["price"] = money.format_money(price[0], price[1])
+            row["price_amount"], row["price_currency"] = price[0], price[1]
+        size = f"{dims[0]:.2f} × {dims[2]:.2f} × {dims[1]:.2f} m (w × d × h)"
+        tag = "" if row["verified"] else " Size and price are as you gave them, not read from a page."
+        if not fits:
+            return {**row, "status": "does_not_fit", "why": f"{size}: does not fit. {fit_text}".strip() + tag}
+        if door.get("passes") is False:
+            return {**row, "status": "does_not_pass_door", "why": f"{size}: fits the spot, but {door['verdict'].lower()} by the simple two-smallest-sides rule.{tag}"}
+        fit_part = f"{size}: fits" + (f", {row['spare_m'] * 100:.0f} cm spare on the tighter side" if "spare_m" in row else "")
+        if price is None:
+            return {**row, "status": "no_price", "why": fit_part + ". No readable price: ask the user." + tag}
+        if cur and price[1] and price[1] != cur:
+            return {**row, "status": "other_currency", "why": fit_part + f". {row['price']}: the budget is in {cur} and the plugin does not convert." + tag}
+        money_part = f". {row['price']}"
+        state = "ok"
+        if status:
+            after_spent = round(status["spent"] + price[0], 2)
+            row["after_add"] = {"spent": after_spent, "remaining": round(status["limit"] - after_spent, 2)}
+            left = row["after_add"]["remaining"]
+            if left < 0:
+                state = "over_budget"
+                money_part += f": would put the room {money.format_money(-left, cur)} over the {money.format_money(status['limit'], cur)} budget"
+            elif status["reserve"] and after_spent > status["spendable"]:
+                state = "uses_reserve"
+                money_part += f": inside the budget, but uses {money.format_money(after_spent - status['spendable'], cur)} of the {money.format_money(status['reserve'], cur)} kept back"
+            else:
+                money_part += f" leaves {money.format_money(left, cur)}"
+        if state == "ok" and ceiling and price[0] > ceiling[0]:
+            state = "over_slot_price"
+            money_part += f": above the {money.format_money(ceiling[0], ceiling[1] or cur)} asked for this piece"
+        if row["issues"] and state == "ok":
+            money_part += ". Note: " + row["issues"][0]
+        return {**row, "status": state, "why": fit_part + money_part + "." + tag}
 
     def product_thumbnail(self, image_url: str) -> str | None:
         return media.product_thumbnail(image_url, self.data_dir / "products")

@@ -211,3 +211,19 @@ def test_add_product_uses_the_title_to_pick_the_axis_rule(tmp_path):
     assert r["ok"], r
     assert r["object"]["category"].startswith("bed")
     assert round(r["object"]["dimensions_m"][0], 2) == 1.70 and round(r["object"]["dimensions_m"][2], 2) == 2.18
+
+
+def test_sizes_are_turned_to_match_the_category_when_the_shop_labels_them_the_other_way():
+    from rs_core import dims
+
+    desk = dims.parse_dimensions('24" D x 42" W x 30" H', category="desk")
+    assert round(desk["width_m"], 2) == 1.07 and round(desk["depth_m"], 2) == 0.61
+    turned = dims.parse_dimensions("61 x 106 x 76 cm", category="desk")  # unlabelled, deeper than wide
+    assert round(turned["width_m"], 2) == 1.06 and round(turned["depth_m"], 2) == 0.61 and turned["reoriented"] and "longer side as the width" in turned["order_note"]
+    bed = dims.parse_dimensions("191 x 139 x 41 cm", category="bed_double")
+    assert round(bed["width_m"], 2) == 1.39 and round(bed["depth_m"], 2) == 1.91
+    lamp = dims.parse_dimensions("97 x 44 x 44 cm", category="lamp_floor")
+    assert round(lamp["height_m"], 2) == 0.97 and round(lamp["width_m"], 2) == 0.44
+    plain = dims.parse_dimensions("120 x 60 x 75 cm", category="desk")
+    assert round(plain["width_m"], 2) == 1.2 and not plain.get("reoriented")
+    assert not dims.parse_dimensions("61 x 106 x 76 cm")["width_m"] == 1.06  # no category: left as read
