@@ -652,9 +652,10 @@ class RoomService:
             tag = f" The page prints no frame size: this is the standard {estimated_from} bed size, an estimate. Add it with dimensions_m only if the user accepts that."
         if not fits:
             return {**row, "status": "does_not_fit", "why": f"{size}: does not fit. {fit_text}".strip() + tag}
-        if door.get("passes") is False:
-            return {**row, "status": "does_not_pass_door", "why": f"{size}: fits the spot, but {door['verdict'].lower()} by the simple two-smallest-sides rule.{tag}"}
         fit_part = f"{size}: fits" + (f", {row['spare_m'] * 100:.0f} cm spare on the tighter side" if "spare_m" in row else "")
+        if door.get("passes") is False:
+            # most furniture this size arrives flat-packed, so this is a caution on the row, not a reason to drop it
+            fit_part += ". Assembled it would not go through the door (two-smallest-sides rule): fine if it comes flat-packed, check if it comes assembled"
         if price is None:
             return {**row, "status": "no_price", "why": fit_part + ". No readable price: ask the user." + tag}
         if cur and price[1] and price[1] != cur:

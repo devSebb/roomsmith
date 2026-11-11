@@ -212,3 +212,9 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
   link, the name, price and photo still come from the page. The furnishing brief
   says to stop and tell the user when several shops in a row refuse the machine.
   209 tests.
+- 2026-11-10 (first complete live furnishing turn, Hermes 0.23 with a Claude Sonnet
+  model): budget and style asked for and saved, web search, four shortlists, four
+  real products added for USD 588.97 of 1,000 in 79 seconds; the saved room's total
+  and sizes match the reply. From that run: a piece that would not pass the door
+  assembled (every queen bed) is now cautioned on its row, not dropped from the
+  recommendation. 210 tests.

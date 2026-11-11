@@ -136,6 +136,16 @@ def test_a_bed_page_with_only_a_mattress_size_gets_the_standard_size_as_a_flagge
     assert obj["provenance"]["dims_source"] == "estimated" and obj["product"]["title"] == "TARVA Bed frame - pine Queen" and obj["product"]["price_amount"] == 149.0
 
 
+def test_a_piece_too_big_for_the_door_is_cautioned_not_dropped(shop):
+    """Found live: every queen bed failed the door rule and lost its recommendation, though beds arrive flat-packed."""
+    svc, room, _ = shop
+    PAGES["queen-bed"] = page("Oak Queen Bed", "299.00", "Width 168 cm, Depth 211 cm, Height 100 cm")
+    out = svc.shortlist(room, "bed_queen", [U("queen-bed")], place={"against_wall": "back", "align": "center"})
+    row = out["candidates"][0]
+    assert row["status"] == "ok" and row["passes_door"] is False and out["recommended"] == 1
+    assert "would not go through the door" in row["why"] and "flat-packed" in row["why"]
+
+
 def test_limits_duplicates_and_bad_input(shop):
     svc, room, calls = shop
     too_many = svc.shortlist(room, "desk", [U("small-desk")] * (SHORTLIST_MAX + 1))
