@@ -7,7 +7,7 @@ through one function.
 ```mermaid
 flowchart LR
   subgraph agent["Agent process"]
-    H["Hermes agent"] --> T["rs_agent/tools.py<br/>10 tools, /room, pre_llm_call hook"]
+    H["Hermes agent"] --> T["rs_agent/tools.py<br/>11 tools, /room, pre_llm_call hook"]
   end
   subgraph web["Dashboard / gateway process"]
     E["Editor<br/>desktop/plugin.js · dashboard/dist/index.js"] -->|REST| A["dashboard/plugin_api.py<br/>FastAPI router"]
@@ -39,8 +39,9 @@ flowchart LR
 | `fitcheck.py` | "Does it fit here", "where could it fit", "will it pass the door" |
 | `store.py` | SQLite: projects, revisions, command receipts, undo and redo stacks, photos |
 | `layout.py` | A model's draft (fractions along walls) → a valid scene, with fallbacks |
-| `dims.py`, `catalog.py` | Printed dimensions in cm/mm/m/in/ft → metres; typical sizes per category |
-| `product_fetch.py` | Reads one product page the user pasted. The only code that opens a connection |
+| `dims.py`, `catalog.py` | Printed dimensions in cm/mm/m/in/ft → metres, turned to match the category; typical sizes per category |
+| `money.py` | Printed prices → amounts; the room's budget status, summed in integer minor units |
+| `product_fetch.py` | Reads one product page. The only code that opens a connection; holds the request cap and the result cache |
 | `media.py` | Photo type sniffing, product thumbnails |
 | `export_glb.py`, `summarize.py` | GLB written with `struct`; text summaries for the agent |
 
@@ -88,6 +89,27 @@ Every edit, from either side, is a command:
   have already used a Roomsmith tool, and only when the user has made revisions
   the agent has not seen. It adds two or three lines to that turn's user message
   ("Since revision 12 the user moved Armchair…"). The system prompt is untouched.
+- **Agent knows what "this" is.** The editor posts its selection to
+  `POST /projects/{id}/selection`. It is a hint in the `meta` table, not a
+  revision, and expires after 15 minutes. The same hook mentions a new selection
+  once.
+
+## Budget and shortlist
+
+The budget is part of the scene (`budget: {limit, currency, reserve}`), set by
+the `set_budget` operation, so it is revisioned and undoable like any edit.
+There is no default amount and no default buffer. `money.budget_status(scene)`
+is the one place totals are computed; products with no readable price or in
+another currency are listed and not counted. Going over raises an `over_budget`
+issue and a note for the agent. Nothing is blocked: the decision is the user's.
+
+`roomsmith_shortlist` takes up to six candidate products for one spot. For each
+it reads the page (cached), tests the size with the same `fitcheck` functions
+the editor uses, checks the door, compares the price with what is left, and
+returns ranked rows with a one-line reason. It writes nothing. A value read
+from the page always wins over what the caller supplied, and a row that was not
+read from a page is never the recommendation. The model picks; code measures
+and adds up.
 
 ## What code decides and what the model decides
 
@@ -101,10 +123,12 @@ or `estimated`.
 
 | | |
 |---|---|
-| Network | `product_fetch.http_get` only: the URL the user pasted, a Shopify store's public product JSON next to it, and the product's main image. The host and every redirect hop must resolve to public addresses; bodies are capped at 8 MB before and after decompression |
+| Network | `product_fetch.http_get` only: a product URL the user or the agent passed in, a Shopify store's public product JSON next to it, and the product's main image. The host and every redirect hop must resolve to public addresses; bodies are capped at 8 MB before and after decompression; at most 80 requests per 10 minutes and 12 per host per minute; results cached a day, refusals half an hour, never retried |
+| Text from web pages | Only title, size line and price reach the model, through `clean_text` (tags, control and invisible characters removed, length-capped). Numbers are parsed by code |
+| Money | No payment, account or purchase code. Prices are what a page printed or the user typed. No currency conversion |
 | Model access | `ctx.llm.complete_structured` with the user's active model, read lazily at call time, for photo reading only |
 | Files read | Image files the user names or uploads, checked by content, 15 MB cap |
-| Files written | Only under `<hermes home>/plugin-data/roomsmith/` (database, photos, thumbnails, `exports/`) |
+| Files written | Only under `<hermes home>/plugin-data/roomsmith/` (database, photos, thumbnails, page-result cache, `exports/`) |
 | Not used | Shell, subprocesses, background threads, environment secrets, tool or model overrides, private Hermes imports |
 
 ## Conventions
@@ -119,7 +143,8 @@ reused within a project.
 
 `tests/` runs the engine, the tools through a recording context that must match
 `plugin.yaml`, the backend through FastAPI's test client loaded the way Hermes
-loads it, a full demo conversation through the tool layer, and
-`tests/test_hardening.py` for the boundaries above. CI also runs Hermes's own
+loads it, a full demo conversation through the tool layer, the budget arithmetic and
+shortlist ranking with injected pages, and `tests/test_hardening.py` for the
+boundaries above. CI also runs Hermes's own
 `plugins doctor --ci` and `plugins validate`, and rebuilds both bundles to check
 they match the committed files.

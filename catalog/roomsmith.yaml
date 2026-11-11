@@ -7,7 +7,7 @@ name: roomsmith
 title: Roomsmith
 repo: https://github.com/devSebb/roomsmith
 sha: "<SHA>"
-description: "One 3D room that you and Hermes both edit, and it tells you whether things fit. Drag furniture in a live editor inside Hermes Desktop or the dashboard, or tell Hermes what to change: one saved room with undo, and each sees what the other did. Start from a photo or measurements, add products from a link at true size, ask whether they fit, export GLB/JSON. No accounts or keys. Network: only GETs to product links you paste (public addresses only). Photos go to your own Hermes model. Photo sizes are estimates until you give one real measurement."
+description: "One 3D room that you and Hermes both edit. It tells you whether things fit and what they cost. Drag furniture in a live editor inside Hermes Desktop or the dashboard, or tell Hermes what to change: one saved room with undo, and each sees what the other did. Give a budget and Hermes furnishes the room with real products, read from their pages and checked against your room and your money. Start from a photo or measurements. No accounts or keys. Network: only GETs to product pages (public addresses only, rate-capped). Never buys anything."
 maintainer: devSebb
 tier: community
 category: desktop

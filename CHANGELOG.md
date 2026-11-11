@@ -150,3 +150,24 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
   - **Structure.** Image handling moved to `rs_core/media.py`; one export builder;
     the backend calls the service only (`save_photo_bytes`, `active_project_id`).
     New `docs/ARCHITECTURE.md`. 139 tests.
+- 2026-11-10 (night): **furnish to a budget**, and Hermes knows what you selected.
+  - `set_budget` / `clear_budget` operations: the user's amount, no default, a
+    buffer only if asked for; revisioned and undoable. `rs_core/money.py` reads
+    printed prices (`$1,899.00`, `1.899,00 €`, `from £649`) and sums in minor
+    units. Products carry `price_amount` / `price_currency`; unpriced and
+    other-currency products are listed, never counted. Going over raises an
+    `over_budget` issue and a note for the agent; nothing is blocked.
+  - New tool `roomsmith_shortlist` (11 tools): up to six real products for one
+    spot, each page read, size tested in the room, door checked, price compared
+    with what is left, ranked with a reason. Adds nothing. Page values win over the
+    caller's; rows not read from a page are never recommended.
+  - Page reads are cached (a day; refusals half an hour) and capped (80 per 10
+    minutes, 12 per shop per minute). Strings from pages are cleaned and capped
+    before the model sees them. Sizes are turned to match the category (a desk
+    is wider than deep, a bed longer than wide).
+  - Editor: budget bar, prices in the object list, budget fields in the Room
+    tab, a price field on products. The editor reports its selection and the
+    `pre_llm_call` hook tells Hermes once, so "would this fit by the window?" works.
+  - Store survey (`scripts/survey-stores.py`): 58 pages; ten shops read fully.
+  - Backend product and shortlist routes run their page reads off the event loop.
+    201 tests.

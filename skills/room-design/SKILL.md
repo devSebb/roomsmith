@@ -1,6 +1,6 @@
 ---
 name: room-design
-description: Design and furnish a room with Roomsmith — read the room, edit it, check what fits, add real products, keep the user's editor in sync.
+description: Design and furnish a room with Roomsmith — read the room, edit it, check what fits, add real products, furnish to the user's budget, keep the user's editor in sync.
 ---
 
 # Room design with Roomsmith
@@ -91,14 +91,65 @@ numbered revision with undo.
 Never fetch anything on the plugin's behalf other than the pages the user
 asked about.
 
+## Furnishing to a budget
+
+The budget is the user's. The plugin adds up exactly and tells you where the
+room stands; it never blocks an add. Staying inside the budget is your job, and
+going over is the user's decision.
+
+1. **Get the amount from the user.** If they gave none ("furnish my room"),
+   ask. Never assume an amount. Confirm the currency if it is unclear. Ask
+   **once**: "Do you want to keep some of that back as a buffer?" An amount or
+   a percentage → pass `reserve` or `reserve_percent`. "No", or no answer → no
+   buffer. Then `roomsmith_apply` `{"op": "set_budget", "limit": 1500, "currency": "USD"}`.
+2. `roomsmith_inspect`. Decide which pieces the room needs, largest first, and
+   roughly what share of the money each can take. Tell the user the list in one
+   short message, then start.
+3. For each piece, find real products with your own web search tool. Collect
+   3 to 6 **product-page** URLs (not category or search pages). **Use only URLs
+   your search returned or the user gave. Never construct or guess a URL.**
+   Shops whose pages read well (size and price): songmics.com (VASAGLE),
+   nathanjames.com, brightech.com, simpli-home.com, walkeredison.com,
+   branchfurniture.com, castlery.com, polyandbark.com. Big marketplaces
+   (Amazon, IKEA, Wayfair, Article) refuse automated reads.
+4. `roomsmith_shortlist {category, candidates: [{url}, …], place?}`. The plugin
+   reads each page, tests the size in the room, checks the door and the budget,
+   and ranks. Read the `why` of each row. Rows with `verified: false` are not
+   page data; never present them as checked.
+5. Add the one you chose with `roomsmith_add_product {url, category, place}`
+   (use the row's `place`). If the reply has a `budget_note` (the room is now
+   over, or into the user's buffer, or the price is unknown), **say so in that
+   same reply and ask** what they want: keep it, swap it for a cheaper row, or
+   raise the budget. Do not quietly continue.
+6. When the pieces are in: `roomsmith_inspect`, then report a table (piece,
+   size, price, link), the total, what is left, the buffer if there is one, and
+   anything without a price. Say that prices are as read today and can change.
+   The plugin does not buy anything.
+7. Limits: at most 6 candidates per shortlist; keep to about 8 shortlists per
+   request. A shop that answers `blocked` is left alone for the rest of the
+   session. `rate_limited` means wait, or ask the user for the printed size and
+   price.
+8. No web search tool? Say so and ask the user to paste a few links per piece.
+   Everything else works the same.
+9. "Does it look good?" The stand-in has the product's true size, its colour
+   and its photo, in the user's room. Say that. It is not a photoreal render.
+10. The user tells you a price the page did not show →
+    `{"op": "update_object", "id": "ob4", "product": {"price": "$120"}}`.
+
 ## When the user edits in the editor
 
 A note at the start of your turn lists what they changed. Acknowledge it in
 a few words and inspect before your next edit. Do not undo their changes
 unless asked.
 
+The note also says what they have **selected** ("the user has 'Armchair' (ob4)
+selected"). When they then say "this", "it" or "that one", they mean it:
+"would this fit by the window?" → `roomsmith_check` `fits_at` with
+`object_id: "ob4"`. `roomsmith_inspect` returns `selected` too. If nothing is
+selected and "this" is unclear, ask which piece.
+
 ## Finishing
 
 - `roomsmith_export` with `glb` for a 3D file, `summary` for a shopping
-  list with links, `json` to save the project.
+  list with prices, a total and links, `json` to save the project.
 - Keep replies short: what you did, the issues if any, one next step.
