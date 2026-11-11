@@ -184,3 +184,4 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
 - 2026-11-10 (late): `set_style` records the look the user asked for; Hermes shops
   with it, the editor shows it, inspect and the shortlist return it. The plugin
   does not judge style and says so. 203 tests.
+- 2026-11-10 (late): screenshots, banner and GIF retaken with the new look (GPU, double resolution).

@@ -12,9 +12,9 @@ price against your budget, and shows the piece at true size.
 
 **Status: 0.1.0 — built for the [Hermes Agent Plugin Hackathon](https://x.com/NousResearch/status/2118094256438936062) (Nous Research, 4–11 November 2026); see [Hackathon](#hackathon) below.**
 
-![Hermes furnishing a bedroom: five real products arrive one at a time and the budget bar fills to USD 680.96 of 1,000](docs/demo.gif)
+![Hermes furnishing a bedroom: five real products arrive one at a time, each with a card showing its photo, name, price and size, and the budget bar fills to USD 680.96 of 1,000](docs/demo.gif)
 
-*Hermes adds real products one at a time; the editor follows and the budget bar fills. (Editor recorded in the development harness, 4 frames a second.)*
+*Real products arrive one at a time; the editor follows and the budget bar fills. (The editor, recorded in the development harness; the products were added through the plugin's tools by a script.)*
 
 ![A bedroom furnished with five real products for USD 680.96 against a USD 1,000 budget: the editor's budget bar, each product's price and footprint in the list, and the pieces at true size in the room](docs/screenshots/01-furnished-to-budget.png)
 
@@ -23,7 +23,7 @@ price against your budget, and shows the piece at true size.
 | | |
 |---|---|
 | ![A product selected: its page's title, price, printed size and link](docs/screenshots/02-real-product.png) | ![A chair dragged into the doorway: the Issues tab says it blocks the door and narrows the walkway](docs/screenshots/03-blocks-the-door.png) |
-| A real product: title, price, printed size and link, read from the page | Drag a chair into the doorway and it says so, with the numbers |
+| A real product: photo, title, price, printed size and link, read from the page | Drag a chair into the doorway and it says so, with the numbers |
 | ![The budget lowered to 600: the bar turns red and reads USD 80.96 over](docs/screenshots/04-over-budget.png) | ![Plan view with wall lengths](docs/screenshots/05-plan-view.png) |
 | Over budget is shown, never blocked: the decision is yours | Plan view with wall lengths |
 
