@@ -368,3 +368,18 @@ def test_described_placement_slides_out_of_the_doorway():
         {"op": "add_object", "name": "Sofa", "category": "sofa", "dimensions_m": [2.25, 0.82, 1.0], "place": {"against_wall": "w3", "align": "center"}},
     )
     assert "no clear spot" in r2.results[1].summary and abs(r2.scene["objects"][0]["position_m"][2] - (5.0 - 0.52)) < 1e-6
+
+
+def test_a_chair_placed_in_front_of_a_desk_faces_the_desk(svc, room):
+    import math
+
+    r = svc.apply({"project_id": room, "operations": [{"op": "add_object", "name": "Desk", "category": "desk", "place": {"against_wall": "right", "align": "center"}}]})
+    desk = r["results"][0]["created_id"]
+    r = svc.apply({"project_id": room, "operations": [{"op": "add_object", "name": "Chair", "category": "chair", "place": {"next_to": desk, "side": "front"}}]})
+    assert r["ok"] and "facing it" in r["results"][0]["summary"]
+    objs = {o["name"]: o for o in svc.scene(room)["scene"]["objects"]}
+    turn = (objs["Chair"]["yaw_rad"] - objs["Desk"]["yaw_rad"]) % (2 * math.pi)
+    assert abs(turn - math.pi) < 1e-3  # opposite headings (yaw is stored to 4 decimals): the chair looks at the desk
+    r = svc.apply({"project_id": room, "operations": [{"op": "add_object", "name": "Stool", "category": "stool", "place": {"next_to": desk, "side": "left"}}]})
+    stool = next(o for o in svc.scene(room)["scene"]["objects"] if o["name"] == "Stool")
+    assert abs(stool["yaw_rad"] - objs["Desk"]["yaw_rad"]) < 1e-3

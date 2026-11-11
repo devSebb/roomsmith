@@ -20,6 +20,8 @@ Conventions
 
 from __future__ import annotations
 
+import math
+
 from typing import Any
 
 from rs_core import geometry as g
@@ -88,8 +90,9 @@ def resolve(scene: dict, obj: dict, place: dict[str, Any]) -> tuple[list[float],
         else:
             raise SceneError("invalid_value", "side must be left, right, front or behind", field="side")
         x, z = g.add((rx, rz), off)
-        yaw = ryaw
-        desc = f"{side} of {ref['name']} ({ref['id']})"
+        # in front of something you face it (a chair at a desk, an armchair at a sofa); beside or behind it you face its way
+        yaw = ryaw + math.pi if side == "front" else ryaw
+        desc = f"{side} of {ref['name']} ({ref['id']})" + (", facing it" if side == "front" else "")
 
     elif "in_corner" in place:
         pair = place["in_corner"]
