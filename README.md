@@ -127,7 +127,7 @@ desktop/plugin.js          the editor as a Hermes Desktop plugin (built)
 web/                       editor source (TypeScript, three.js, React) + build
 skills/room-design/        how the agent should work with a room
 tests/                     pytest (engine, tools, backend, product pages, budget,
-                           shortlist, hardening) — 215 tests
+                           shortlist, hardening, review findings) — 240 tests
 docs/                      architecture, compatibility record, screenshots
 ```
 
@@ -171,8 +171,9 @@ the room facing that wall.
   addresses are contacted: the host, and the host of every redirect, must resolve
   to public IPs (no localhost, private ranges or link-local), and responses are
   capped at 8 MB. Requests are bounded: at most 80 per 10 minutes and 12 per
-  shop per minute; a page that read is reused for a day and a shop that refused is
-  not asked again for half an hour. The plugin does not search the web (Hermes
+  shop per minute (counted separately by the agent and by the editor's backend);
+  a page that read is reused for a day, and a shop that refused is left alone for
+  10 to 30 minutes. The plugin does not search the web (Hermes
   does, with your own search tool) and follows no links inside pages. Only the
   title, size line and price from a page reach the model, cleaned and
   length-capped; never page text. Photos you
@@ -213,8 +214,8 @@ the room facing that wall.
   - *Refuse automated reads:* Lowe's, Home Depot, Article, Wayfair.
   - A shop can also refuse one machine and answer another: in testing, one
     network was refused by every Shopify store (HTTP 429) while another read the
-    same pages. The plugin reports `blocked`, does not retry, and Hermes asks
-    you for the size and price or tries another shop.
+    same pages. The plugin reports `blocked`, leaves that shop alone for 10 to
+    30 minutes, and Hermes asks you for the size and price or tries another shop.
 
   A few pages read a wrong size or the default variant's price. Check the
   stand-in's size and price against the page before you buy;

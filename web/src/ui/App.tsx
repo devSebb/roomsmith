@@ -243,7 +243,7 @@ function BudgetFields({ store, scene }: { store: Store; scene: Scene }) {
   const [limit, setLimit] = React.useState(b ? String(b.limit) : '')
   const [currency, setCurrency] = React.useState(b?.currency || 'USD')
   const [reserve, setReserve] = React.useState(b && b.reserve ? String(b.reserve) : '')
-  React.useEffect(() => { setLimit(b ? String(b.limit) : ''); setCurrency(b?.currency || 'USD'); setReserve(b && b.reserve ? String(b.reserve) : '') }, [b?.limit, b?.currency, b?.reserve])
+  React.useEffect(() => { setLimit(b ? String(b.limit) : ''); setCurrency(b?.currency || 'USD'); setReserve(b && b.reserve ? String(b.reserve) : '') }, [scene.project.id, b?.limit, b?.currency, b?.reserve])
   const save = () => {
     const op: Record<string, unknown> = { op: 'set_budget', limit: limit.trim(), currency: currency.trim() || undefined }
     if (reserve.trim()) op.reserve = reserve.trim()
@@ -266,7 +266,7 @@ function BudgetFields({ store, scene }: { store: Store; scene: Scene }) {
 
 function StyleField({ store, scene }: { store: Store; scene: Scene }) {
   const [v, setV] = React.useState(scene.style || '')
-  React.useEffect(() => setV(scene.style || ''), [scene.style])
+  React.useEffect(() => setV(scene.style || ''), [scene.project.id, scene.style])
   const commit = () => { if (v.trim() !== (scene.style || '')) store.apply([{ op: 'set_style', style: v.trim() }]) }
   return <div className="rs-row"><input className="rs-in" placeholder="e.g. warm minimalist, light wood" maxLength={120} value={v} onChange={e => setV(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} /></div>
 }

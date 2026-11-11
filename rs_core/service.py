@@ -49,6 +49,8 @@ class RoomService:
     # ------------------------------------------------------------ helpers
 
     def _resolve_project(self, project_id: str | None) -> str | None:
+        if project_id is not None and not isinstance(project_id, str):
+            return None  # a list or an object is not a room id; the caller reports "no such room"
         if project_id:
             try:
                 self.store.get_project(project_id)
@@ -237,7 +239,7 @@ class RoomService:
         if expected is not None:
             try:
                 expected = int(expected)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 return _err("invalid_value", "expected_revision must be an integer")
 
         # Read-modify-write under the database write lock, so a writer in another
@@ -402,8 +404,13 @@ class RoomService:
         pid = self._resolve_project(project_id)
         if not pid:
             return self._no_project(project_id)
-        title = (title or "").strip()
+        title = str(title or "").strip() if isinstance(title, (str, int, float)) else ""
+        url = url.strip() if isinstance(url, str) and url.strip() else None
+        image_url = image_url if isinstance(image_url, str) else None
+        dimensions_text = dimensions_text if isinstance(dimensions_text, str) and dimensions_text.strip() else None
+        price = price if isinstance(price, (str, int, float)) and not isinstance(price, bool) else None
         fetched: dict | None = None
+        page_parsed: dict | None = None
         # a bare size from the agent, with no printed text behind it, is the agent's estimate unless it says who stated it
         size_is_estimate = dimensions_m is not None and not dimensions_text and actor == "agent" and str(dims_source or "").lower() not in ("stated", "measured")
         if url and dimensions_m is not None and not (title and price and image_url):
@@ -421,15 +428,22 @@ class RoomService:
             price = price or fetched.get("price")
             image_url = image_url or fetched.get("image_url")
             dimensions_text = fetched.get("dimensions_text")
-            tall = None if dimensions_text else self._height_only_size(category, title)
-            if tall:
+            page_dims = fetched.get("dims") or {}
+            tall = None if fetched.get("dimensions_m") else self._height_only_size(category, title)
+            if fetched.get("dimensions_m"):
+                # the size the page reader already worked out: the same numbers the shortlist showed, never a second parse of the text
+                dimensions_m = [float(v) for v in fetched["dimensions_m"]]
+                page_parsed = page_dims
+                if page_dims.get("height_assumed"):
+                    size_is_estimate = True  # the page printed a footprint only; the height is the category's usual one
+            elif tall:
                 # a floor lamp's page often gives only its height: use it with a typical base, as an estimate
                 dimensions_m, size_is_estimate = tall, True
             elif not dimensions_text:
                 return _err("dimensions_not_found", f"Read the page for {title or url!r} (title, price, image) but it prints no readable dimensions. Ask the user for the size, then call again with dimensions_m.", fetched={k: fetched.get(k) for k in ("title", "price", "image_url", "source")})
         if not title:
             return _err("missing_field", "title is required (or give a url to read it from)")
-        parsed = None
+        parsed = page_parsed
         if dimensions_m is None and dimensions_text:
             parsed = dims_mod.parse_dimensions(dimensions_text, category=normalize_category(category or title))
             if parsed is None:
@@ -591,7 +605,10 @@ class RoomService:
             if page.get("ok"):
                 source = page.get("source") or "page"
                 row["title"] = page.get("title") or row["title"]
-                row["verified"] = bool(page.get("dimensions_m"))
+                # read from the page in full; a footprint with the category's usual height is an estimate, not a reading
+                row["verified"] = bool(page.get("dimensions_m")) and not (page.get("dims") or {}).get("height_assumed")
+                if (page.get("dims") or {}).get("height_assumed"):
+                    row["size_estimated"] = True
                 dims = page.get("dimensions_m")
                 price_text = page.get("price") or None  # the page's price, or unknown: never the caller's guess
                 if page.get("notes"):
@@ -675,7 +692,13 @@ class RoomService:
         money_part = f". {row['price']}"
         state = "ok"
         if status:
-            after_spent = round(status["spent"] + price[0], 2)
+            freed = 0.0
+            if old is not None:
+                # it takes the place of a piece that is already counted: that piece's price comes off first
+                was = money.product_price(old.get("product")) if isinstance(old.get("product"), dict) else None
+                if was and any(i["id"] == old["id"] for i in status["items"]):
+                    freed = was[0]
+            after_spent = round(status["spent"] - freed + price[0], 2)
             row["after_add"] = {"spent": after_spent, "remaining": round(status["limit"] - after_spent, 2)}
             left = row["after_add"]["remaining"]
             if left < 0:

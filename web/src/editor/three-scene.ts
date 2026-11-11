@@ -119,7 +119,7 @@ export class ObjectView {
     this.snapTo(obj)
   }
   setLabel(theme: Theme) {
-    if (this.label) this.group.remove(this.label)
+    if (this.label) { this.group.remove(this.label); this.disposeLabel() }
     const [w, h, d] = this.obj.dimensions_m
     const size = `${w.toFixed(2)} × ${h.toFixed(2)} × ${d.toFixed(2)} m`
     const p = this.obj.product
@@ -127,6 +127,12 @@ export class ObjectView {
     this.label = p ? makeProductCard(this.obj.name, p.price_amount ? priceTag(p.price_amount, p.price_currency || ObjectView.currency) : 'no price', size, p.image_data || null) : makeLabel(this.obj.name, theme, size)
     this.label.position.set(0, h + (p ? 0.34 : 0.25), 0)
     this.group.add(this.label)
+  }
+  /** Free the tag's canvas texture and material (tags are rebuilt on hover, selection and relabel). */
+  disposeLabel() {
+    if (!this.label) return
+    const m = this.label.material as THREE.SpriteMaterial
+    m.map?.dispose(); m.dispose()
   }
   snapTo(o: SceneObject) {
     this.obj = o

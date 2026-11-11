@@ -15,6 +15,9 @@ MAX_AMOUNT = 10_000_000.0
 SYMBOLS = {"US$": "USD", "CA$": "CAD", "C$": "CAD", "A$": "AUD", "AU$": "AUD", "NZ$": "NZD", "$": "USD", "€": "EUR", "£": "GBP", "¥": "JPY", "₹": "INR"}
 _CODE = re.compile(r"(?<![A-Za-z])([A-Z]{3})(?![A-Za-z])")
 _NUMBER = re.compile(r"\d[\d.,   ']*\d|\d")
+_NOT_THE_PRICE_BEFORE = re.compile(r"\b(was|were|save|saving|savings|off|regular( price)?|reg\.?|list( price)?|original(ly)?|compare( at)?|msrp|rrp|from)\W*[$€£]?\s*$", re.I)
+_NOT_THE_PRICE_AFTER = re.compile(r"\s*(/\s*(mo|month|wk|week)|per (month|week)|a month|x \d|%|\s*off\b)", re.I)
+_THE_PRICE_BEFORE = re.compile(r"\b(now|sale( price)?|only|today|price)\W*[$€£]?\s*$", re.I)
 _KNOWN_CODES = {"USD", "EUR", "GBP", "CAD", "AUD", "NZD", "JPY", "CHF", "SEK", "NOK", "DKK", "PLN", "CZK", "MXN", "BRL", "INR", "SGD", "HKD", "CNY", "KRW", "ZAR", "AED"}
 
 
@@ -62,19 +65,26 @@ def parse_price(value: Any, default_currency: str | None = None) -> tuple[float,
                 currency = currency or mm.group(1)
                 marks.append(mm.span())
         for sym in sorted(SYMBOLS, key=len, reverse=True):
-            at = value.find(sym)
-            if at >= 0:
+            spots = [(mm.start(), mm.end()) for mm in re.finditer(re.escape(sym), value)]
+            if spots:  # every place the symbol appears: "was $119 now $59.99" has two amounts
                 currency = currency or SYMBOLS[sym]
-                marks.append((at, at + len(sym)))
+                marks.extend(spots)
                 break
         numbers = list(_NUMBER.finditer(value))
         if not numbers:
             return None
         # "2 seats, $499": the amount is the number that touches the currency mark
         near = [n for n in numbers if any(abs(n.start() - e) <= 2 or abs(s0 - n.end()) <= 2 for s0, e in marks)]
-        got = _to_float((near or numbers)[0].group(0))
+        pool = near or numbers
+        # "was $119 now $59.99", "Save $50! Now $249", "$25/mo or $299": the price to pay, not the old one, the saving or the instalment
+        live = [n for n in pool if not _NOT_THE_PRICE_BEFORE.search(value[max(0, n.start() - 28): n.start()]) and not _NOT_THE_PRICE_AFTER.match(value[n.end(): n.end() + 14])]
+        after_now = [n for n in live if _THE_PRICE_BEFORE.search(value[max(0, n.start() - 16): n.start()])]
+        pick = (after_now or live or pool)[0]
+        got = _to_float(pick.group(0))
         if got is None:
             return None
+        if re.match(r"\s?k\b", value[pick.end(): pick.end() + 2], re.I):
+            got *= 1000  # "1.5k"
         amount = got
     else:
         return None
@@ -100,7 +110,7 @@ def product_price(product: dict | None, default_currency: str | None = None) -> 
     if not isinstance(product, dict):
         return None
     amount = product.get("price_amount")
-    if isinstance(amount, (int, float)) and not isinstance(amount, bool) and math.isfinite(amount) and amount > 0:
+    if isinstance(amount, (int, float)) and not isinstance(amount, bool) and math.isfinite(amount) and 0 < amount <= MAX_AMOUNT:
         return round(float(amount), 2), currency_code(product.get("price_currency")) or currency_code(default_currency)
     return parse_price(product.get("price"), default_currency)
 
@@ -115,6 +125,14 @@ def budget_status(scene: dict) -> dict | None:
     reserve = max(0, min(_cents(b.get("reserve") or 0), limit))
     items, unpriced, other = [], [], []
     spent = 0
+    stated = cur
+    if cur is None:
+        # no currency on the budget: the first priced product sets it, so that dollars and euros are never added together
+        for obj in scene.get("objects", []):
+            first = product_price(obj.get("product")) if isinstance(obj.get("product"), dict) else None
+            if first and first[1]:
+                cur = first[1]
+                break
     for obj in scene.get("objects", []):
         product = obj.get("product")
         if not isinstance(product, dict):
@@ -136,6 +154,7 @@ def budget_status(scene: dict) -> dict | None:
     out = {
         "limit": limit / 100,
         "currency": cur,
+        **({"currency_assumed_from_products": True} if cur and not stated else {}),
         "reserve": reserve / 100,
         "spendable": spendable / 100,
         "spent": spent / 100,

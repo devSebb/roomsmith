@@ -8,6 +8,8 @@ depth front-to-back.
 
 from __future__ import annotations
 
+import re
+
 from dataclasses import dataclass
 
 
@@ -142,8 +144,8 @@ PHRASES = {
     "bar stool": "stool", "counter stool": "stool", "storage bench": "bench", "nesting table": "table_coffee", "console table": "table_side",
     "writing desk": "desk", "standing desk": "desk", "computer desk": "desk", "uplighter": "lamp_floor", "torchiere": "lamp_floor",
     "floor uplighter": "lamp_floor", "arc lamp": "lamp_floor", "tripod lamp": "lamp_floor", "desk lamp": "lamp_table", "bedside lamp": "lamp_table",
-    "love seat": "loveseat", "sofa bed": "sofa", "futon": "sofa", "daybed": "bed_single", "chest": "dresser", "credenza": "sideboard", "buffet": "sideboard",
-    "plant": "plant", "planter": "plant", "tree": "plant",
+    "love seat": "loveseat", "sofa bed": "sofa", "sleeper sofa": "sofa", "futon": "sofa", "bed bench": "bench", "end of bed bench": "bench", "floating shelf": "shelf", "wall shelf": "shelf", "plant stand": "table_side", "christmas tree": "other", "tower fan": "other", "desk fan": "other", "standing fan": "other", "chest freezer": "other", "daybed": "bed_single", "chest": "dresser", "credenza": "sideboard", "buffet": "sideboard",
+    "plant": "plant", "planter": "plant", "tree": "plant", "lamp": "lamp_table",
 }
 _BED_SIZES = (("bed_king", ("king",)), ("bed_queen", ("queen",)), ("bed_double", ("full", "double")), ("bed_single", ("twin", "single")))
 
@@ -160,19 +162,28 @@ def normalize_category(category: str | None) -> str:
         return ALIASES[spaced]
     if spaced in CATALOG:
         return spaced
+    # what it is comes before what it has: "Desk with Bookshelf" is a desk, "Wardrobe Closet with Mirror" a wardrobe
+    head = re.split(r"\b(?:with|for|w/|and|plus|includes?|including)\b", spaced, maxsplit=1)[0].strip()
+    if head and head != spaced:
+        first = normalize_category(head)
+        if first != "other":
+            return first
+    phrases = {**ALIASES, **PHRASES}
+    known = set(CATALOG) | {w for k in phrases for w in k.split()}
     words = spaced.split()
-    singular = [w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w for w in words]
+    # plurals only where the singular is a word we know ("rugs" -> "rug", "shelves" -> "shelf"; "christmas" stays)
+    singular = ["shelf" if w == "shelves" else (w[:-1] if w.endswith("s") and w[:-1] in known else w) for w in words]
     text = " " + " ".join(singular) + " "
+    # multi-word names first: "sofa bed" is a sofa and "bedside table" a nightstand, whatever single words they contain
+    for phrase in sorted((k for k in phrases if " " in k), key=len, reverse=True):
+        if f" {phrase} " in text:
+            return phrases[phrase]
     # a bed is a bed whatever else its name mentions ("bed frame" must not become a picture frame)
     if " bed " in text or " bedframe " in text:
         for cat, size_words in _BED_SIZES:
             if any(f" {w} " in text for w in size_words):
                 return cat
         return "bed"
-    phrases = {**ALIASES, **PHRASES}
-    for phrase in sorted((k for k in phrases if " " in k), key=len, reverse=True):
-        if f" {phrase} " in text:
-            return phrases[phrase]
     # then the last word that names something ("leather sofa" -> "sofa")
     for token in reversed(singular):
         if token in CATALOG:

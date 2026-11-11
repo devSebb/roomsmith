@@ -75,6 +75,8 @@ _FT_IN = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:ft|feet|foot|'|’)\s*(\d+(?:[.,]\d
 
 # labelled value: "W 180 cm", "Width: 228 cm", "180 cm W", "71\" W"
 # labels may be glued to their number ("W88.6\"", "180cmW"): bound them by non-letters, not \b
+_PART_OF_IT = re.compile(r"\b(seat|arm|armrest|leg|legs|back|backrest|shelf|drawer|interior|inside|inner|cushion|mattress|clearance|package|packaging|box|carton|table ?top|top|base|shade|cord|cable)\s*[:\-]?\s*$")
+_NOT_ITS_SIZE = re.compile(r"(fits? through|door(way)?s?|clearance|from (the )?(floor|ground)|floor to|box size|package size|shipping)\b[^.;\n]{0,24}$")
 _LABEL_FIRST = re.compile(rf"(?<![A-Za-z])({_LABEL})(?![A-Za-z])\s*[:=]?\s*({_NUM})\s*({_UNIT})?", re.I)
 _VALUE_FIRST = re.compile(rf"({_NUM})\s*({_UNIT})?\s*(?<![A-Za-z])({_LABEL})(?![A-Za-z])", re.I)
 _TRIPLE = re.compile(rf"({_NUM})\s*({_UNIT})?\s*(?:x|×|\*|by)\s*({_NUM})\s*({_UNIT})?\s*(?:x|×|\*|by)\s*({_NUM})\s*({_UNIT})?", re.I)
@@ -192,6 +194,7 @@ def _parse_dimensions(text: str | None, default_unit: str | None = None, categor
         return None
     raw = text.strip()
     s = raw.replace("×", "x").replace("＊", "*")
+    s = re.sub(r"(\d)\s*(?:''|’’|″|\u201d)", r'\1"', s)  # two apostrophes are an inch mark, not feet
     s = re.sub(r"(\d),(\d{3})(?!\d)", r"\1\2", s)  # 1,800 -> 1800 (thousands separators)
     labelled: dict[str, float] = {}
     unit_seen: str | None = None
@@ -209,11 +212,17 @@ def _parse_dimensions(text: str | None, default_unit: str | None = None, categor
 
     # labelled values first; a unit printed on one of them ("W 27.5 x D 27.5 x H 34.5 inches")
     # is the unit of the ones printed without, before any guess from the numbers
+    # "Seat height 18 in", "Arm height 25 in", "fits through doors 30 in wide" measure a part or a doorway,
+    # not the piece: they are skipped. "Overall height" outranks a bare "Height".
     found: list[tuple[int, str, float, str | None]] = []
-    for mt in _LABEL_FIRST.finditer(s):
-        found.append((mt.start(), LABELS[mt.group(1).lower()], _to_float(mt.group(2)), mt.group(3)))
-    for mt in _VALUE_FIRST.finditer(s):
-        found.append((mt.start(), LABELS[mt.group(3).lower()], _to_float(mt.group(1)), mt.group(2)))
+    for kind, pattern in (("label", _LABEL_FIRST), ("value", _VALUE_FIRST)):
+        for mt in pattern.finditer(s):
+            before = s[max(0, mt.start() - 26): mt.start()].lower()
+            if _PART_OF_IT.search(before) or _NOT_ITS_SIZE.search(s[max(0, mt.start() - 40): mt.start()].lower()):
+                continue
+            label, val, unit = (LABELS[mt.group(1).lower()], _to_float(mt.group(2)), mt.group(3)) if kind == "label" else (LABELS[mt.group(3).lower()], _to_float(mt.group(1)), mt.group(2))
+            found.append((0 if "overall" in before or "total" in before else 1, label, val, unit))
+    found.sort(key=lambda f: f[0])  # stable: overall values first, otherwise the order they were found in
     # label-first matches keep priority over value-first ones ("Width: 228 cm Depth: 93 cm" must not read 228 as the depth)
     shared = trailing_unit or default_unit or next((u for _, _, _, u in found if _unit_factor(u, None)[0] is not None), None)
     for _, label, val, unit in found:

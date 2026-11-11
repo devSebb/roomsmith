@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import html
+import http.client
 import ipaddress
 import json
 import re
@@ -57,6 +58,7 @@ MAX_PER_HOST_PER_MINUTE = 12  # a product read is one or two requests
 CACHE_OK_S = 24 * 3600.0
 CACHE_BLOCKED_S = 30 * 60.0
 CACHE_MAX_FILES = 300
+REFUSED_HOST_S = {429: 30 * 60.0, 503: 10 * 60.0, 403: 10 * 60.0, 401: 10 * 60.0}  # how long a shop that refused is left alone
 
 
 class FetchError(Exception):
@@ -76,10 +78,21 @@ class RateLimit:
         self._lock = threading.Lock()
         self._all: list[float] = []
         self._hosts: dict[str, list[float]] = {}
+        self._refused: dict[str, float] = {}
+
+    def refused(self, host: str, status: int) -> None:
+        """A shop said no: leave the whole shop alone for a while, not just that page."""
+        with self._lock:
+            self._refused[host] = self._clock() + REFUSED_HOST_S.get(status, 600.0)
 
     def take(self, host: str) -> None:
         now = self._clock()
         with self._lock:
+            until = self._refused.get(host)
+            if until is not None:
+                if now < until:
+                    raise FetchError("blocked", "This shop refused a request a few minutes ago; it is being left alone for now. Ask the user for the sizes printed on the page, or try another shop.")
+                del self._refused[host]
             self._all = [t for t in self._all if now - t < WINDOW_S]
             mine = [t for t in self._hosts.get(host, []) if now - t < 60.0]
             if len(self._all) >= MAX_REQUESTS_PER_WINDOW or len(mine) >= MAX_PER_HOST_PER_MINUTE:
@@ -199,11 +212,13 @@ def http_get(url: str, timeout: float = TIMEOUT_S, accept: str = "text/html,appl
             return data, resp.headers.get("Content-Type", ""), resp.geturl()
     except urllib.error.HTTPError as e:
         if e.code in (401, 403, 429, 503):
+            RATE_LIMIT.refused((urllib.parse.urlparse(url).hostname or "").lower(), e.code)
             raise FetchError("blocked", f"The site refused the request (HTTP {e.code}). Ask the user for the sizes printed on the page.") from e
         raise FetchError("http_error", f"HTTP {e.code} fetching the page") from e
     except urllib.error.URLError as e:
         raise FetchError("unreachable", f"Could not reach the site: {e.reason}") from e
-    except (TimeoutError, OSError, ValueError) as e:
+    except (TimeoutError, OSError, ValueError, http.client.HTTPException) as e:
+        # includes http.client.InvalidURL: an address with a space or a control character in it
         raise FetchError("unreachable", f"Could not read the site: {type(e).__name__}") from e
 
 
@@ -338,9 +353,20 @@ def _price_from_offers(offers: Any) -> str | None:
     cur = offers.get("priceCurrency") or spec.get("priceCurrency") or ""
     if isinstance(price, (dict, list)) or isinstance(cur, (dict, list)):
         return None
+    price = _structured_amount(price)
     if price is None:
         return None
     return f"{cur} {price}".strip()
+
+
+def _structured_amount(value: Any) -> Any:
+    """A price from structured data uses a dot as its decimal mark, whatever the digits
+    after it: "249.000" is 249, not 249,000, and "24.990" is 24.99. Those are rewritten
+    with two decimals so nothing downstream reads the dot as a thousands separator;
+    every other value is returned as it came."""
+    if isinstance(value, str) and re.fullmatch(r"\s*\d+\.\d{3,}\s*", value):
+        return f"{float(value):.2f}"
+    return value
 
 
 def _first_dict(v: Any) -> dict | None:
@@ -429,7 +455,7 @@ def _from_meta(page: _Page) -> dict:
     out: dict[str, Any] = {"source": "og" if any(k.startswith("og:") for k in m) else "page"}
     out["title"] = m.get("og:title") or m.get("twitter:title") or page.title.strip() or None
     out["image_url"] = m.get("og:image") or m.get("og:image:secure_url") or m.get("twitter:image")
-    amt = m.get("product:price:amount") or m.get("og:price:amount")
+    amt = _structured_amount(m.get("product:price:amount") or m.get("og:price:amount"))
     cur = m.get("product:price:currency") or m.get("og:price:currency") or ""
     out["price"] = f"{cur} {amt}".strip() if amt else None
     out["texts"] = [m.get("og:description") or m.get("description") or ""]
@@ -495,6 +521,19 @@ def _looks_like_challenge(body: bytes) -> bool:
 # ------------------------------------------------------------------ entry point
 
 
+def _safe_link(value: Any, base: str) -> str | None:
+    """An image address from a page, only if it is an ordinary public http(s) URL of sane length."""
+    if not isinstance(value, str) or not value.strip() or len(value) > 600:
+        return None
+    try:
+        link = urllib.parse.urljoin(base, value.strip())
+        if any(ch.isspace() or ord(ch) < 32 for ch in link):
+            link = urllib.parse.quote(link, safe=":/?&=%#+,;@!$'()*~-._")
+        return check_url(link)
+    except (FetchError, ValueError):
+        return None
+
+
 def fetch_product(url: str, category: str | None = None, _get=http_get) -> dict:
     """Read one product page. Never raises: a site problem or a page shaped in a way
     this reader did not expect comes back as ok False with a code."""
@@ -553,12 +592,13 @@ def _read_page(url: str, category: str | None, _get) -> dict:
         "url": final_url,
         "title": clean_text(found.get("title"), 120),
         "price": clean_text(found.get("price"), 40),
-        "image_url": found.get("image_url"),
+        "image_url": _safe_link(found.get("image_url"), final_url),
         "source": found.get("source"),
         "notes": notes,
     }
     if parsed:
         out["dimensions_text"] = clean_text(parsed.pop("dimensions_text"), 160)
+        parsed.pop("parsed_from", None)  # the raw line: never returned, only the cleaned, capped copy above
         out["dimensions_m"] = [parsed["width_m"], parsed["height_m"], parsed["depth_m"]]
         out["dims"] = parsed
         if parsed.get("height_assumed"):

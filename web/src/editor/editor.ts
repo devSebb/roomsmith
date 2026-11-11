@@ -269,6 +269,7 @@ export class Editor {
   exportGLB(): Promise<ArrayBuffer> {
     const root = new THREE.Group()
     root.name = 'Roomsmith'
+    for (const om of this.room?.openingMeshes.values() || []) om.visible = true // every door and window is exported, whatever the camera was hiding
     this.scene3.updateMatrixWorld(true)
     this.scene3.traverse(o => {
       const m = o as THREE.Mesh
@@ -310,7 +311,7 @@ export class Editor {
     if (!v) return
     const want = this.showLabels || id === this.selected || id === this.hovered
     if (want && !v.label) v.setLabel(this.theme)
-    if (!want && v.label) { v.group.remove(v.label); v.label = null }
+    if (!want && v.label) { v.group.remove(v.label); v.disposeLabel(); v.label = null }
   }
 
   flash(ids: string[]) {
@@ -351,6 +352,7 @@ export class Editor {
       this.controls.enabled = false
       this.renderer.shadowMap.enabled = false
       if (this.room) this.room.planLines.visible = true
+      for (const om of this.room?.openingMeshes.values() || []) om.visible = true // the 3D view hides openings in walls it looks through; the plan shows them all
       this.frameOrtho()
     } else {
       this.camera = this.persp
@@ -473,7 +475,7 @@ export class Editor {
     for (const h of hits) {
       const u = h.object.userData
       if (u.objectId) return { objectId: u.objectId, point: h.point }
-      if (u.openingId) return { openingId: u.openingId, point: h.point }
+      if (u.openingId) { if (!h.object.visible) continue; return { openingId: u.openingId, point: h.point } } // a door hidden with its see-through wall is not clickable
       if (u.wallId) {
         const mat = (h.object as THREE.Mesh).material as THREE.MeshStandardMaterial
         if (mat.opacity < 0.5) continue // see through faded walls

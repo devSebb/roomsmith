@@ -80,9 +80,18 @@ def _guard(fn: Callable[[dict, dict], Any]) -> Callable[..., str]:
 def _int(value: Any, default: int) -> int:
     """A count from the model: 2, "2" or 2.0; anything else falls back to the default."""
     try:
-        return max(1, int(float(value)))
-    except (TypeError, ValueError):
+        return max(1, min(1000, int(float(value))))
+    except (TypeError, ValueError, OverflowError):
         return default
+
+
+def _s(value: Any) -> str | None:
+    """A text argument: a string (or a bare number) as text; anything else is treated as not given."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return str(value)
+    return None
 
 
 def _obj(value: Any) -> dict | None:
@@ -159,9 +168,9 @@ def projects(args: dict, kwargs: dict) -> dict:
 def new_room(args: dict, kwargs: dict) -> dict:
     svc = get_service()
     layout = _obj(args.get("layout"))
-    out = svc.create_project(args.get("name"), args.get("width_m"), args.get("depth_m"), args.get("height_m"), draft=layout, actor="agent")
+    out = svc.create_project(_s(args.get("name")), args.get("width_m"), args.get("depth_m"), args.get("height_m"), draft=layout, actor="agent")
     if out.get("ok") and args.get("photo_ids"):
-        svc.attach_photos(out["project_id"], [str(p) for p in args["photo_ids"]])
+        svc.attach_photos(out["project_id"], [str(p) for p in args["photo_ids"]] if isinstance(args["photo_ids"], list) else [str(args["photo_ids"])])
     if out.get("ok") and layout is not None:
         out["next_step"] = "Sizes are estimates. Ask the user for one real measurement (a wall length or the door width) and calibrate."
     return _trim_inspect(out)
@@ -209,15 +218,15 @@ def add_product(args: dict, kwargs: dict) -> dict:
     svc = get_service()
     return svc.add_product(
         args.get("project_id"),
-        title=str(args.get("title") or ""),
-        dimensions_text=args.get("dimensions_text"),
+        title=_s(args.get("title")) or "",
+        dimensions_text=_s(args.get("dimensions_text")),
         dimensions_m=args.get("dimensions_m"),
         dims_source=args.get("dims_source"),
-        url=args.get("url"),
-        image_url=args.get("image_url"),
-        price=args.get("price"),
-        category=args.get("category"),
-        color=args.get("color"),
+        url=_s(args.get("url")),
+        image_url=_s(args.get("image_url")),
+        price=_s(args.get("price")),
+        category=_s(args.get("category")),
+        color=_s(args.get("color")),
         place=_obj(args.get("place")),
         expected_revision=args.get("expected_revision"),
         actor="agent",
@@ -240,7 +249,7 @@ def shortlist(args: dict, kwargs: dict) -> dict:
         category=str(args.get("category") or ""),
         candidates=candidates,
         place=_obj(args.get("place")),
-        replace_object_id=args.get("replace_object_id"),
+        replace_object_id=_s(args.get("replace_object_id")),
         max_price=args.get("max_price"),
     )
 

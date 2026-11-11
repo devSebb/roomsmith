@@ -68,7 +68,7 @@ def product_thumbnail(image_url: str, cache_dir: Path, max_px: int = 384, max_by
         return cached.read_text() or None
     try:
         data, _ctype, _final = product_fetch.http_get(image_url, timeout=10, accept="image/*")
-    except product_fetch.FetchError:
+    except Exception:  # noqa: BLE001 - a picture is a nicety: no thumbnail, never a failed add
         return None
     kind = sniff_image(data)
     if kind is None:

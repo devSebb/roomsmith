@@ -1,13 +1,13 @@
 """pre_llm_call hook: tell the agent what the user did in the editor.
 
 Fires in sessions that have already used a Roomsmith tool (and, for a plain "furnish
-my bedroom" request, in a session that has not yet). When the user asks to furnish,
-decorate or shop, it gives the agent the furnishing steps and the room's budget state:
-tool descriptions are loaded lazily by the host, so this is where the agent is sure to
-see them. Otherwise two things, each only when there is something new: revisions the user made by hand that the agent
+my bedroom" instruction, in a session that has not yet). When the user asks to furnish,
+decorate or shop, it gives the agent the furnishing steps and the room's budget state
+(seven lines): tool descriptions are loaded lazily by the host, so this is where the
+agent is sure to see them. Otherwise two things, each only when there is something new: revisions the user made by hand that the agent
 has not seen, and what the user has selected (so "this" and "it" mean something).
 The text goes into the current user message for this turn only, so the cached
-system prompt is untouched. Never more than a few lines.
+system prompt is untouched. The change and selection notes are a few lines.
 """
 
 from __future__ import annotations
@@ -19,8 +19,19 @@ import re
 from rs_agent import tools
 
 MAX_LINES = 4
-_FURNISH = re.compile(r"\b(furnish\w*|decorat\w*|budget|shop(ping)?|buy(ing)?|under\s*[$€£]?\s*\d|for\s*[$€£]\s*\d|[$€£]\s*\d|\d[\d,.]*\s*(k\b|dollars?|usd|euros?|eur|pounds?|gbp|bucks))", re.I)
-_FURNISH_COLD = re.compile(r"\b(furnish\w*|decorat\w*)\b.*\b(room|bedroom|office|studio|apartment|flat|kitchen|lounge|nursery)\b|\b(room|bedroom|office|studio|apartment|flat|kitchen|lounge|nursery)\b.*\b(furnish\w*|decorat\w*)\b", re.I | re.S)
+_ROOM = r"(room|bedroom|office|studio|apartment|flat|kitchen|lounge|nursery|place|space|home|house)"
+_PIECE = r"(sofa|couch|rug|lamp|desk|chair|armchair|bed|table|shelf|bookshelf|bookcase|dresser|nightstand|mirror|plant|wardrobe|stool|bench|art|furniture|decor)"
+# A request to furnish, decorate or shop for the room, or to find a piece, or a money amount with its currency.
+# Deliberately narrow: "under 2 metres wide", "which shop is this from?" and "the decorative box" are ordinary edits.
+_FURNISH = re.compile(
+    r"\b(furnish|furnishing|decorate|decorating|redecorate|budget|spend|shopping list)\b"
+    rf"|\b(pick|recommend|suggest|find|choose|look for|shop for|buy|need (a|an|some)|want (a|an|some))\b[^.?!\n]{{0,40}}\b{_PIECE}s?\b"
+    r"|[$€£]\s?\d|\b\d[\d,.]*\s*(k\b|dollars?\b|usd\b|euros?\b|eur\b|pounds?\b|gbp\b|bucks\b)",
+    re.I,
+)
+# In a session that has not used Roomsmith yet: only a plain instruction to furnish or decorate a room.
+# "furnished flat" and "decorators" (the Python kind) do not count.
+_FURNISH_COLD = re.compile(rf"\b(furnish|decorate|redecorate)\b[^.?!\n]{{0,50}}\b{_ROOM}\b|\b(furnishing|decorating)\b[^.?!\n]{{0,20}}\b(my|our|the|this|a)\b[^.?!\n]{{0,20}}\b{_ROOM}\b", re.I)
 
 
 def _text(message: Any) -> str:

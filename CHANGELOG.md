@@ -235,3 +235,28 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
   reports an overlap with the table standing on it. A floor lamp whose page gives
   only its height is added with that height on a typical base, marked as an
   estimate, where the add used to fail. 215 tests.
+- 2026-11-11 (independent review of the previous day's code; every item has a test in
+  `tests/test_review_findings.py`):
+  - A wrong size could be reported as read from the page: "Seat height", "Arm
+    height" and "fits through doors 30 in wide" were taken as the piece's own
+    measurements. Part and doorway measurements are skipped and "overall" values
+    win. Two apostrophes (`34''`) are inches.
+  - Raw page text reached the model through `dims.parsed_from`, and the image
+    address was returned unchecked. Neither is returned now.
+  - A product image address containing a space failed the whole add.
+  - The shortlist counted a replaced piece's price as still spent.
+  - Adding from a link re-parsed the size text and could fail on a row the
+    shortlist had just passed; it now uses the page reader's own numbers. A
+    footprint with the category's usual height is an estimate, not a reading.
+  - Prices: the old price, the saving and the monthly instalment are no longer
+    taken ("was $119 now $59.99" is 59.99); structured prices like "249.000" are
+    249; "1.5k" and a "10%" buffer are understood; a budget with no currency
+    takes the first product's and never adds dollars to euros.
+  - The furnishing brief was injected into unrelated chats ("Python decorators",
+    "furnished flat") and ordinary edits ("under 2 metres wide"). The triggers
+    are narrow now and tested on both lists.
+  - A shop that refuses a request is left alone as a whole for 10 to 30 minutes.
+  - Editor: a door hidden with its see-through wall could still be clicked, stayed
+    hidden in plan view and was missing from the GLB; tag textures were not freed.
+  - Odd argument types (lists for ids, infinite numbers) return readable errors.
+  - Product names: "Desk with Bookshelf" is a desk, "Sofa Bed" a sofa. 240 tests.

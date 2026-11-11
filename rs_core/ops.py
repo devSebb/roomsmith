@@ -829,13 +829,19 @@ def op_set_budget(scene: dict, op: dict) -> OpResult:
     if op.get("currency") and not money.currency_code(op.get("currency")):
         raise SceneError("invalid_value", "currency must be a three-letter code such as USD or EUR", field="currency")
     reserve = 0.0
+    if isinstance(op.get("reserve"), str) and op["reserve"].strip().endswith("%"):
+        op = {**op, "reserve_percent": op["reserve"].strip().rstrip("%").strip(), "reserve": None}  # "10%" is a share, not ten dollars
     if op.get("reserve") is not None:
         got = money.parse_price(op["reserve"]) if op["reserve"] not in (0, "0", 0.0) else (0.0, None)
         if got is None:
             raise SceneError("invalid_value", "reserve must be an amount, or leave it out for no buffer", field="reserve")
         reserve = got[0]
     elif op.get("reserve_percent") is not None:
-        reserve = round(limit * _num(op["reserve_percent"], "reserve_percent", 0, 50) / 100, 2)
+        try:
+            percent = float(op["reserve_percent"])
+        except (TypeError, ValueError):
+            raise SceneError("invalid_value", "reserve_percent must be a number from 0 to 50", field="reserve_percent") from None
+        reserve = round(limit * _num(percent, "reserve_percent", 0, 50) / 100, 2)
     if reserve >= limit:
         raise SceneError("out_of_range", "The amount kept back must be smaller than the budget", field="reserve")
     scene["budget"] = {"limit": limit, "currency": currency, "reserve": reserve}

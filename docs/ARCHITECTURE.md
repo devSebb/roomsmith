@@ -93,6 +93,13 @@ Every edit, from either side, is a command:
   `POST /projects/{id}/selection`. It is a hint in the `meta` table, not a
   revision, and expires after 15 minutes. The same hook mentions a new selection
   once.
+- **Agent gets the furnishing steps when asked to furnish.** Hermes loads tool
+  descriptions lazily and skills on request, so a plain "furnish it" would reach
+  the model with no procedure. When the user's message asks to furnish, decorate
+  or shop (or names an amount of money), the same hook adds a seven-line brief
+  with the steps and the room's budget state. In a session that has not used
+  Roomsmith it does this only for a plain instruction to furnish or decorate a
+  room; ordinary edits and unrelated chats get nothing.
 
 ## Budget and shortlist
 
@@ -127,13 +134,13 @@ or `estimated`.
 
 | | |
 |---|---|
-| Network | `product_fetch.http_get` only: a product URL the user or the agent passed in, a Shopify store's public product JSON next to it, and the product's main image. The host and every redirect hop must resolve to public addresses; bodies are capped at 8 MB before and after decompression; at most 80 requests per 10 minutes and 12 per host per minute; results cached a day, refusals half an hour, never retried |
-| Text from web pages | Only title, size line and price reach the model, through `clean_text` (tags, control and invisible characters removed, length-capped). Numbers are parsed by code |
+| Network | `product_fetch.http_get` only: a product URL the user or the agent passed in, a Shopify store's public product JSON next to it, and the product's main image. The host and every redirect hop must resolve to public addresses; bodies are capped at 8 MB before and after decompression; at most 80 requests per 10 minutes and 12 per host per minute in each process (the agent and the backend each count their own); results cached a day; a shop that refuses (401/403/429/503) is left alone for 10 to 30 minutes, the whole shop and not just that page |
+| Text from web pages | Only the title, the size line and the price reach the model, each through `clean_text` (tags, control and invisible characters removed; capped at 120, 160 and 40 characters). The image address is returned only if it is an ordinary public http(s) URL. Numbers are parsed by code; a size that cannot belong to that kind of furniture, or that measures a part (seat height, doorway width), is not taken |
 | Money | No payment, account or purchase code. Prices are what a page printed or the user typed. No currency conversion |
 | Model access | `ctx.llm.complete_structured` with the user's active model, read lazily at call time, for photo reading only |
 | Files read | Image files the user names or uploads, checked by content, 15 MB cap |
 | Files written | Only under `<hermes home>/plugin-data/roomsmith/` (database, photos, thumbnails, page-result cache, `exports/`) |
-| Not used | Shell, subprocesses, background threads, environment secrets, tool or model overrides, private Hermes imports |
+| Not used | Shell, subprocesses, background processes or threads of its own, environment secrets, tool or model overrides, private Hermes imports. (The backend hands a blocking page read to the web server's own worker pool for the length of that one request.) |
 
 ## Conventions
 
