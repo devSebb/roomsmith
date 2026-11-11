@@ -174,3 +174,10 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
 - 2026-11-10 (night): six new screenshots (furnished to a budget, a real product,
   blocked door, over budget, plan view, light theme) and a new banner.
 - 2026-11-10 (night): `docs/demo.gif` (8 s, 230 KB): a room being furnished piece by piece against a budget.
+- 2026-11-10 (late): the editor's look. Furniture has softened edges; beds get a
+  duvet, desk chairs a swivel base and armrests, lampshades glow. A real product
+  floats a small card (photo, name, price, size) in place of the photo stuck on
+  its faces. Windows are bright with a frame and glazing bars; doors have a frame
+  and handle; a door or window in a wall you are looking through is hidden.
+  Prices show with a currency symbol. New **Showcase** button: the camera circles
+  the room until you drag. Things placed "in front of" a piece now face it.

@@ -1,7 +1,7 @@
 import React from 'react'
 import type { Api } from '../api'
 import { Editor, type ViewMode } from '../editor/editor'
-import { budgetBar, cm, deg, fmt, money, rad, wallLength } from '../editor/math'
+import { budgetBar, cm, deg, fmt, money, priceTag, rad, wallLength } from '../editor/math'
 import type { Theme } from '../editor/three-scene'
 import { Store, type State } from '../store'
 import type { BudgetStatus, Issue, Opening, Scene, SceneObject, Wall } from '../types'
@@ -44,6 +44,7 @@ export function App(props: AppProps) {
   const [labels, setLabels] = React.useState(true)
   const [drag, setDrag] = React.useState<{ on: boolean; snapped: string | null; bad: boolean }>({ on: false, snapped: null, bad: false })
   const [tab, setTab] = React.useState<'room' | 'objects' | 'issues' | 'history' | 'add'>('objects')
+  const [showcase, setShowcase] = React.useState(false)
   const [narrow, setNarrow] = React.useState(false)
   React.useLayoutEffect(() => { setNarrow((rootRef.current?.clientWidth || 1000) < 640) }, []) // decide the layout before first paint
 
@@ -72,6 +73,7 @@ export function App(props: AppProps) {
       onDragState: (on, snapped, bad) => setDrag({ on, snapped, bad }),
     }, { theme, showLabels: true })
     editorRef.current = ed
+    ed.onShowcaseEnd = () => setShowcase(false)
     store.onFlash = ids => ed.flash(ids)
     if (props.shell === 'dev') (window as any).__rs = { editor: ed, store }
     if (rootRef.current) (rootRef.current as any).__rs = { editor: ed, store } // for the Desktop smoke script
@@ -92,7 +94,7 @@ export function App(props: AppProps) {
   const selectedOpening = scene?.room.openings.find(o => o.id === s.selectedOpeningId) || null
 
   return (
-    <div className={'rs-root' + (narrow ? ' rs-narrow' : '')} ref={rootRef}>
+    <div className={'rs-root' + (narrow ? ' rs-narrow' : '') + (showcase ? ' rs-showcase' : '')} ref={rootRef}>
       <style>{CSS}</style>
       <div className="rs-toolbar">
         <ProjectSwitcher store={store} s={s} />
@@ -100,6 +102,7 @@ export function App(props: AppProps) {
         <button className={'rs-btn sm' + (mode === 'plan' ? ' on' : '')} onClick={() => ed?.setMode('plan')} title="Plan view (V)">Plan</button>
         <button className="rs-btn sm" onClick={() => { if (s.selectedId) ed?.focus(s.selectedId); else ed?.frameRoom() }} title="Frame (F)">⌖</button>
         <button className={'rs-btn sm' + (labels ? ' on' : '')} onClick={() => { setLabels(!labels); ed?.setLabels(!labels) }} title={labels ? 'Hide all labels (L) — the selected object keeps its tag' : 'Show all labels (L)'}>{labels ? 'Labels on' : 'Labels off'}</button>
+        <button className={'rs-btn sm' + (showcase ? ' on' : '')} disabled={!scene} onClick={() => { const on = !showcase; setShowcase(on); ed?.setShowcase(on) }} title="Showcase: the camera circles the room. Drag to stop.">{showcase ? '■ Showcase' : '▶ Showcase'}</button>
         <span className="rs-spacer" />
         <button className="rs-btn sm" disabled={!s.canUndo} onClick={() => store.undo()} title="Undo (⌘Z)">↶ Undo</button>
         <button className="rs-btn sm" disabled={!s.canRedo} onClick={() => store.redo()} title="Redo (⇧⌘Z)">↷ Redo</button>
@@ -213,7 +216,7 @@ function ObjectList({ store, scene, issues, onFocus }: { store: Store; scene: Sc
           <span className="rs-sw" style={{ background: o.color }} />
           <span className="rs-name">{o.name}{o.locked ? ' 🔒' : ''}</span>
           {bad.has(o.id) && <span className="rs-badge warn">!</span>}
-          {o.product && (o.product.price_amount ? <span className="rs-price">{money(o.product.price_amount, o.product.price_currency)}</span> : <span className="rs-price" title="No price known: not in the total. Select it to type one.">no price</span>)}
+          {o.product && (o.product.price_amount ? <span className="rs-price">{priceTag(o.product.price_amount, o.product.price_currency || scene.budget?.currency)}</span> : <span className="rs-price" title="No price known: not in the total. Select it to type one.">no price</span>)}
           <span className="rs-dim">{fmt(o.dimensions_m[0])}×{fmt(o.dimensions_m[2])}</span>
         </div>
       ))}

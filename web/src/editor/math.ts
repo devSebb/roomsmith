@@ -202,6 +202,13 @@ export const money = (amount: number, currency?: string | null) => {
   return currency ? `${currency} ${body}` : body
 }
 
+const SYMBOL: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', CAD: 'CA$', AUD: 'A$', JPY: '¥' }
+/** A short price for tags and lists: "$169.99", "€80", "SEK 1,200". */
+export const priceTag = (amount: number, currency?: string | null) => {
+  const body = money(amount)
+  return currency ? (SYMBOL[currency] ? SYMBOL[currency] + body : `${currency} ${body}`) : body
+}
+
 /** Geometry and wording of the budget bar. `fill` and `tick` are 0..1 of the bar's width;
  *  `tick` (where the kept-back part starts) is null when the user set no buffer. */
 export function budgetBar(b: { limit: number; currency: string | null; reserve: number; spent: number }) {

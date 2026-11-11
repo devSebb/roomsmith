@@ -71,7 +71,7 @@ export class Editor {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.05
+    this.renderer.toneMappingExposure = 1.15
     const el = this.renderer.domElement
     el.style.display = 'block'
     el.style.width = '100%'
@@ -126,8 +126,8 @@ export class Editor {
   // ------------------------------------------------------------ lifecycle
 
   private buildLights() {
-    const hemi = new THREE.HemisphereLight(0xfff4e6, 0x6b7a8a, 1.0)
-    const sun = new THREE.DirectionalLight(0xfff1dd, 1.25)
+    const hemi = new THREE.HemisphereLight(0xfff6ea, 0x8a8f96, 1.3)
+    const sun = new THREE.DirectionalLight(0xffeed6, 1.35)
     sun.position.set(6, 10, 4)
     sun.castShadow = true
     sun.shadow.mapSize.set(2048, 2048)
@@ -224,6 +224,8 @@ export class Editor {
 
   setScene(scene: Scene, issues: Issue[], animate = true) {
     const first = !this.scene
+    const currency = scene.budget?.currency || null
+    if (currency !== ObjectView.currency) { ObjectView.currency = currency; for (const id of this.objects.keys()) this.relabel(id) }
     this.scene = scene
     this.issues = issues
     const key = JSON.stringify(scene.room) + this.theme.text
@@ -282,10 +284,25 @@ export class Editor {
     return new Promise((res, rej) => new GLTFExporter().parse(root, r => res(r as ArrayBuffer), rej, { binary: true }))
   }
 
+  /** Showcase: the camera circles the room slowly. Any drag on the canvas ends it. */
+  showcase = false
+  onShowcaseEnd: (() => void) | null = null
+  setShowcase(on: boolean) {
+    this.showcase = on
+    this.controls.autoRotate = on
+    this.controls.autoRotateSpeed = 1.1
+    if (on && this.mode !== '3d') this.setMode('3d')
+    this.render()
+  }
+
   setLabels(on: boolean) {
     this.showLabels = on
     for (const id of this.objects.keys()) this.syncLabel(id)
     this.render()
+  }
+  private relabel(id: string) {
+    const v = this.objects.get(id)
+    if (v?.label) v.setLabel(this.theme)
   }
   private syncLabel(id: string) {
     const v = this.objects.get(id)
@@ -392,6 +409,8 @@ export class Editor {
       const side = (cam.x - a.x) * n[0] + (cam.z - a.z) * n[1]
       // camera on the outside of this wall (side < 0) -> fade so you can see in
       const target = side < 0 ? 0.12 : 1
+      // a door or window in a wall you are looking through would hang in front of the room
+      for (const o of this.scene.room.openings) if (o.wall_id === wall.id) { const om = this.room.openingMeshes.get(o.id); if (om) om.visible = side >= 0 }
       for (const m of this.room.wallMeshes.get(wall.id) || []) {
         const mat = m.material as THREE.MeshStandardMaterial
         mat.opacity += (target - mat.opacity) * 0.25
@@ -452,6 +471,7 @@ export class Editor {
   }
 
   private onPointerDown = (e: PointerEvent) => {
+    if (this.showcase) { this.setShowcase(false); this.onShowcaseEnd?.() }
     this.renderer.domElement.focus()
     if (e.button !== 0) return
     this.setPointer(e)

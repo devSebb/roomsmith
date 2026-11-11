@@ -3,7 +3,7 @@
 
 import * as THREE from 'three'
 import type { Opening, Scene, SceneObject, Wall } from '../types'
-import { inwardNormal, wallSegment, type P } from './math'
+import { inwardNormal, priceTag, wallSegment, type P } from './math'
 import { buildShape } from './shapes'
 
 export const WALL_T = 0.08
@@ -47,7 +47,54 @@ function makeLabel(text: string, theme: Theme, sub?: string): THREE.Sprite {
   return sprite
 }
 
+/** A floating card for a real product: thumbnail, name, price, size. Always faces the camera. */
+function makeProductCard(name: string, price: string, size: string, image: string | null): THREE.Sprite {
+  const H = 112, pad = 14, thumb = image ? H - 2 * pad : 0
+  const canvas = document.createElement('canvas')
+  const measure = canvas.getContext('2d')!
+  const title = name.length > 30 ? name.slice(0, 29).trimEnd() + '…' : name
+  const fTitle = '600 26px system-ui, -apple-system, Segoe UI, sans-serif'
+  const fPrice = '700 30px system-ui, -apple-system, Segoe UI, sans-serif'
+  const fSize = '400 20px system-ui, -apple-system, Segoe UI, sans-serif'
+  measure.font = fTitle; const w1 = measure.measureText(title).width
+  measure.font = fPrice; const w2 = measure.measureText(price).width
+  measure.font = fSize; const w3 = measure.measureText(size).width
+  const textX = pad + (thumb ? thumb + 14 : 0)
+  canvas.width = Math.ceil(textX + Math.max(w1, w2 + 16 + w3) + pad)
+  canvas.height = H
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.colorSpace = THREE.SRGBColorSpace
+  const draw = (img?: HTMLImageElement) => {
+    const c = canvas.getContext('2d')!
+    c.clearRect(0, 0, canvas.width, H)
+    c.fillStyle = 'rgba(250,250,248,0.96)'
+    c.beginPath(); c.roundRect(0, 0, canvas.width, H, 18); c.fill()
+    if (thumb) {
+      c.save(); c.beginPath(); c.roundRect(pad, pad, thumb, thumb, 10); c.clip()
+      c.fillStyle = '#ffffff'; c.fillRect(pad, pad, thumb, thumb)
+      if (img && img.width && img.height) {
+        const k = Math.min(thumb / img.width, thumb / img.height)
+        c.drawImage(img, pad + (thumb - img.width * k) / 2, pad + (thumb - img.height * k) / 2, img.width * k, img.height * k)
+      }
+      c.restore()
+    }
+    c.textBaseline = 'top'
+    c.fillStyle = '#1c1e22'; c.font = fTitle; c.fillText(title, textX, 16)
+    c.fillStyle = '#0b7a43'; c.font = fPrice; c.fillText(price, textX, 58)
+    c.fillStyle = 'rgba(28,30,34,0.6)'; c.font = fSize; c.fillText(size, textX + w2 + 16, 66)
+    tex.needsUpdate = true
+  }
+  draw()
+  if (image) { const img = new Image(); img.onload = () => draw(img); img.src = image }
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }))
+  sprite.scale.set(canvas.width * LABEL_SCALE * 0.72, H * LABEL_SCALE * 0.72, 1)
+  sprite.renderOrder = 10
+  return sprite
+}
+
 export class ObjectView {
+  /** The room's budget currency: what a bare price on a product card is shown in. */
+  static currency: string | null = null
   group = new THREE.Group()
   /** Invisible bounding box: what the mouse picks and drags. The visible parts are `parts`. */
   mesh: THREE.Mesh
@@ -67,54 +114,18 @@ export class ObjectView {
     this.edges.visible = this.parts.length <= 1 // outline only for plain boxes; shaped objects speak for themselves
     this.group.add(this.mesh, shape.group, this.edges)
     this.applyOpacity()
-    if (obj.product?.image_data) this.addProductCard(obj.product.image_data, w, h, d)
     if (showLabels) this.setLabel(theme)
     this.group.userData.objectId = obj.id
     this.snapTo(obj)
   }
-  /** The product's photo on the stand-in, as a hang-tag on its front and back faces
-   *  (the stand-in itself wears the photo's colour), or on top for flat things (rugs). */
-  private addProductCard(dataUrl: string, w: number, h: number, d: number) {
-    const flat = h < 0.15
-    const faces: { faceW: number; faceH: number; pos: [number, number, number]; rotY: number; rotX: number }[] = flat
-      ? [{ faceW: w, faceH: d, pos: [0, h + 0.003, 0], rotY: 0, rotX: -Math.PI / 2 }]
-      : [
-          { faceW: w, faceH: h, pos: [0, h / 2, -d / 2 - 0.004], rotY: Math.PI, rotX: 0 }, // front (-Z), faces outward
-          { faceW: w, faceH: h, pos: [0, h / 2, d / 2 + 0.004], rotY: 0, rotX: 0 }, // back (+Z)
-        ]
-    const planes = faces.map(f => {
-      const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.98, depthWrite: false }))
-      plane.userData.objectId = this.obj.id
-      plane.position.set(...f.pos)
-      plane.rotation.set(f.rotX, f.rotY, 0)
-      plane.renderOrder = 2
-      plane.visible = false
-      this.group.add(plane)
-      return plane
-    })
-    new THREE.TextureLoader().load(dataUrl, t => {
-      const img = t.image as { width: number; height: number }
-      if (!img?.width || !img?.height) return
-      t.colorSpace = THREE.SRGBColorSpace
-      t.needsUpdate = true
-      const ar = img.width / img.height
-      faces.forEach((f, i) => {
-        const fill = flat ? 0.96 : 0.62 // a tag, not a wrap
-        let pw = f.faceW * fill, ph = pw / ar
-        if (ph > f.faceH * fill) { ph = f.faceH * fill; pw = ph * ar }
-        const plane = planes[i]
-        ;(plane.material as THREE.MeshBasicMaterial).map = t
-        ;(plane.material as THREE.MeshBasicMaterial).needsUpdate = true
-        plane.scale.set(pw, ph, 1)
-        plane.visible = true
-      })
-    })
-  }
   setLabel(theme: Theme) {
     if (this.label) this.group.remove(this.label)
     const [w, h, d] = this.obj.dimensions_m
-    this.label = makeLabel(this.obj.name, theme, `${w.toFixed(2)} × ${h.toFixed(2)} × ${d.toFixed(2)} m`)
-    this.label.position.set(0, h + 0.25, 0)
+    const size = `${w.toFixed(2)} × ${h.toFixed(2)} × ${d.toFixed(2)} m`
+    const p = this.obj.product
+    // a real product floats a small card: its photo, name, price and size
+    this.label = p ? makeProductCard(this.obj.name, p.price_amount ? priceTag(p.price_amount, p.price_currency || ObjectView.currency) : 'no price', size, p.image_data || null) : makeLabel(this.obj.name, theme, size)
+    this.label.position.set(0, h + (p ? 0.34 : 0.25), 0)
     this.group.add(this.label)
   }
   snapTo(o: SceneObject) {
@@ -141,7 +152,7 @@ export class ObjectView {
   }
   sameShape(o: SceneObject) {
     const a = this.obj, b = o
-    return a.shape === b.shape && a.color === b.color && a.name === b.name && a.category === b.category && a.mount === b.mount && a.locked === b.locked && (a.product?.image_data || null) === (b.product?.image_data || null) && a.dimensions_m.every((v, i) => Math.abs(v - b.dimensions_m[i]) < 1e-6)
+    return a.shape === b.shape && a.color === b.color && a.name === b.name && a.category === b.category && a.mount === b.mount && a.locked === b.locked && (a.product?.price_amount || null) === (b.product?.price_amount || null) && (a.product?.image_data || null) === (b.product?.image_data || null) && a.dimensions_m.every((v, i) => Math.abs(v - b.dimensions_m[i]) < 1e-6)
   }
   private applyOpacity() {
     const o = this.obj.mount === 'ceiling' ? 0.45 : this.obj.locked ? 0.95 : 1 // hanging things must not hide the room under them
@@ -153,7 +164,13 @@ export class ObjectView {
     else if (mode === 'hover') { emissive = col(theme.accent); k = 0.15 }
     else if (mode === 'bad') { emissive = col(theme.warn); k = 0.6 }
     else if (mode === 'flash') { emissive = col(theme.accent); k = 0.8 }
-    for (const p of this.parts) { const m = p.material as THREE.MeshStandardMaterial; if ('emissive' in m) { m.emissive = emissive; m.emissiveIntensity = k } }
+    for (const p of this.parts) {
+      const m = p.material as THREE.MeshStandardMaterial
+      if (!('emissive' in m)) continue
+      const glow = m.userData.glow as { color: string; k: number } | undefined
+      if (k === 0 && glow) { m.emissive = new THREE.Color(glow.color); m.emissiveIntensity = glow.k } // a lampshade keeps its own light
+      else { m.emissive = emissive; m.emissiveIntensity = k }
+    }
     this.applyOpacity()
   }
   dispose() {
@@ -266,15 +283,31 @@ function openingPanel(o: Opening, a: P, dir: P, n: P, yaw: number, theme: Theme)
   const isWin = o.kind === 'window'
   const geo = new THREE.BoxGeometry(o.width_m, o.height_m, WALL_T * 0.6)
   geo.translate(0, o.height_m / 2, 0)
-  const mat = new THREE.MeshStandardMaterial({
-    color: isWin ? new THREE.Color('#9ec5e8') : new THREE.Color('#c9b08a'),
-    transparent: true, opacity: isWin ? 0.45 : 0.55, roughness: 0.4, side: THREE.DoubleSide,
-  })
+  // a window is daylight: pale, lit from behind; a door is a wooden leaf you can see through when it faces you
+  const mat = isWin
+    ? new THREE.MeshStandardMaterial({ color: new THREE.Color('#dcecf8'), emissive: new THREE.Color('#bfdcf5'), emissiveIntensity: 0.85, transparent: true, opacity: 0.6, roughness: 0.15, side: THREE.DoubleSide })
+    : new THREE.MeshStandardMaterial({ color: new THREE.Color(o.kind === 'door' ? '#b9905f' : '#c9b08a'), transparent: true, opacity: o.kind === 'door' ? 0.7 : 0.3, roughness: 0.6, side: THREE.DoubleSide })
   const mesh = new THREE.Mesh(geo, mat)
   const cx = a[0] + dir[0] * (o.offset_m + o.width_m / 2) - n[0] * WALL_T / 2
   const cz = a[1] + dir[1] * (o.offset_m + o.width_m / 2) - n[1] * WALL_T / 2
   mesh.position.set(cx, o.sill_m, cz)
   mesh.rotation.y = yaw
+  // frame (and a mullion and transom for windows), as children so they move and fade with the panel
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0xf6f4ef, roughness: 0.7 })
+  const t = 0.05, depth = WALL_T * 1.15
+  const bar = (w: number, h: number, x: number, y: number) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, depth), frameMat); m.position.set(x, y, 0); mesh.add(m) }
+  bar(o.width_m + t, t, 0, o.height_m)                        // head
+  bar(t, o.height_m, -o.width_m / 2, o.height_m / 2)           // jambs
+  bar(t, o.height_m, o.width_m / 2, o.height_m / 2)
+  if (isWin) {
+    bar(o.width_m + t * 2, t, 0, 0)                            // sill
+    if (o.width_m > 0.9) bar(t * 0.6, o.height_m, 0, o.height_m / 2)
+    if (o.height_m > 1.0) bar(o.width_m, t * 0.6, 0, o.height_m * 0.62)
+  } else if (o.kind === 'door') {
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.025, depth * 1.6), new THREE.MeshStandardMaterial({ color: 0x8d9196, roughness: 0.35, metalness: 0.7 }))
+    handle.position.set(((o.hinge || 'left') === 'left' ? 1 : -1) * (o.width_m / 2 - 0.1), 1.0, 0)
+    mesh.add(handle)
+  }
   return mesh
 }
 
