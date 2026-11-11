@@ -173,3 +173,4 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
     201 tests.
 - 2026-11-10 (night): six new screenshots (furnished to a budget, a real product,
   blocked door, over budget, plan view, light theme) and a new banner.
+- 2026-11-10 (night): `docs/demo.gif` (8 s, 230 KB): a room being furnished piece by piece against a budget.

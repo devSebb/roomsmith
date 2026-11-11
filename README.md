@@ -12,6 +12,10 @@ price against your budget, and shows the piece at true size.
 
 **Status: 0.1.0 — built for the [Hermes Agent Plugin Hackathon](https://x.com/NousResearch/status/2118094256438936062) (Nous Research, 4–11 November 2026); see [Hackathon](#hackathon) below.**
 
+![Hermes furnishing a bedroom: five real products arrive one at a time and the budget bar fills to USD 680.96 of 1,000](docs/demo.gif)
+
+*Hermes adds real products one at a time; the editor follows and the budget bar fills. (Editor recorded in the development harness, 4 frames a second.)*
+
 ![A bedroom furnished with five real products for USD 680.96 against a USD 1,000 budget: the editor's budget bar, each product's price and footprint in the list, and the pieces at true size in the room](docs/screenshots/01-furnished-to-budget.png)
 
 *Five real products, read from their shop pages, placed at true size. The budget bar is exact; the room above came to USD 680.96 of 1,000.*
