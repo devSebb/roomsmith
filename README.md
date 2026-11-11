@@ -1,6 +1,6 @@
 # Roomsmith — a Hermes Agent plugin
 
-Checked on every change: engine tests on Python 3.11/3.14, editor typecheck and tests, bundles rebuilt and compared with the committed ones, and Hermes's own `plugins doctor --ci` and `plugins validate`. Run them yourself with `scripts/ci-local.sh`.
+[![validate](https://github.com/devSebb/roomsmith/actions/workflows/validate.yml/badge.svg)](https://github.com/devSebb/roomsmith/actions/workflows/validate.yml) — on every push: engine tests on Python 3.11/3.14, editor typecheck and tests, bundles rebuilt and compared with the committed ones, and Hermes's own `plugins doctor --ci` and `plugins validate`. Run the same checks locally with `scripts/ci-local.sh`.
 
 One 3D room that you and Hermes both edit. It tells you whether things fit and
 what they cost. Drag the furniture by hand in an editor inside Hermes Desktop,
