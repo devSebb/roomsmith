@@ -421,7 +421,11 @@ class RoomService:
             price = price or fetched.get("price")
             image_url = image_url or fetched.get("image_url")
             dimensions_text = fetched.get("dimensions_text")
-            if not dimensions_text:
+            tall = None if dimensions_text else self._height_only_size(category, title)
+            if tall:
+                # a floor lamp's page often gives only its height: use it with a typical base, as an estimate
+                dimensions_m, size_is_estimate = tall, True
+            elif not dimensions_text:
                 return _err("dimensions_not_found", f"Read the page for {title or url!r} (title, price, image) but it prints no readable dimensions. Ask the user for the size, then call again with dimensions_m.", fetched={k: fetched.get(k) for k in ("title", "price", "image_url", "source")})
         if not title:
             return _err("missing_field", "title is required (or give a url to read it from)")
@@ -453,7 +457,7 @@ class RoomService:
         op: dict = {
             "op": "add_object",
             "name": title[:60],
-            "category": category or title,
+            "category": category if category and normalize_category(category) != "other" else (title or category),
             "dimensions_m": dimensions_m,
             "provenance": {"class": "dimensioned_placeholder", "dims_source": "estimated" if size_is_estimate else "stated", "confidence": 0.6 if size_is_estimate else 0.9},
             "product": product,
@@ -609,6 +613,11 @@ class RoomService:
                 dims = None
         row["source"] = source
         estimated_from = None
+        if dims is None and url and row.get("title"):
+            tall = self._height_only_size(cat, row["title"])
+            if tall:
+                dims, estimated_from = tall, "height"
+                row["size_estimated"] = True
         if dims is None and url and row.get("title") and (cat or "").startswith("bed"):
             # bed pages often give only the mattress size ("Queen"); the standard size for that word is a usable estimate
             named = next((c for c, words in product_fetch.BED_SIZE_WORDS.items() if re.search(rf"\b(?:{words})\b", row["title"], re.I)), None)
@@ -649,7 +658,9 @@ class RoomService:
             row["price_amount"], row["price_currency"] = price[0], price[1]
         size = f"{dims[0]:.2f} × {dims[2]:.2f} × {dims[1]:.2f} m (w × d × h)"
         tag = "" if row["verified"] else " Size and price are as you gave them, not read from a page."
-        if estimated_from:
+        if estimated_from == "height":
+            tag = " The page prints only the height: the base is a typical size, an estimate. Say so when you add it."
+        elif estimated_from:
             tag = f" The page prints no frame size: this is the standard {estimated_from} bed size, an estimate. Add it with dimensions_m only if the user accepts that."
         if not fits:
             return {**row, "status": "does_not_fit", "why": f"{size}: does not fit. {fit_text}".strip() + tag}
@@ -681,6 +692,21 @@ class RoomService:
         if row["issues"] and state == "ok":
             money_part += ". Note: " + row["issues"][0]
         return {**row, "status": state, "why": fit_part + money_part + "." + tag}
+
+    @staticmethod
+    def _height_only_size(category: str | None, title: str | None) -> list[float] | None:
+        """[w, h, d] for a floor lamp whose page gives just its height (in its name): that
+        height on the category's typical base. None for anything else."""
+        cat = normalize_category(category) if category else "other"
+        if cat == "other":
+            cat = normalize_category(title)
+        if cat != "lamp_floor":
+            return None
+        height = dims_mod.length_with_unit(title)
+        spec = spec_for("lamp_floor")
+        if height is None or not (spec.min[1] * 0.6 <= height <= spec.max[1] * 1.3):
+            return None
+        return [spec.default[0], round(height, 4), spec.default[2]]
 
     def product_thumbnail(self, image_url: str) -> str | None:
         return media.product_thumbnail(image_url, self.data_dir / "products")

@@ -318,6 +318,8 @@ def op_remove_opening(scene: dict, op: dict) -> OpResult:
 def op_add_object(scene: dict, op: dict) -> OpResult:
     name = _str(op.get("name") or op.get("category") or "", "name")
     category = normalize_category(op.get("category") or name)
+    if category == "other" and name:
+        category = normalize_category(name)  # a vague category, but the name says what it is
     dims = parse_dims(op["dimensions_m"]) if "dimensions_m" in op else None
     provenance = op.get("provenance") if isinstance(op.get("provenance"), dict) else None
     source = str(op.get("dims_source") or "").lower()

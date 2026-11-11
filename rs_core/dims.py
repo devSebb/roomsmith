@@ -300,6 +300,22 @@ def _result(width: float, height: float, depth: float, raw: str, assumed_order: 
     }
 
 
+_LENGTH_WITH_UNIT = re.compile(r"(?<![\d.])(\d+(?:[.,]\d+)?)\s*(cm|mm|inches|inch|in|ft|m|\"|\u201d|\u2033)(?![a-z])", re.I)
+
+
+def length_with_unit(text: str | None) -> float | None:
+    """The last length in a text that carries its own unit ('… dark red 72 "' -> 1.83), in metres.
+    Numbers without a unit (a model year, a product number) are never taken."""
+    if not text or not isinstance(text, str):
+        return None
+    found = _LENGTH_WITH_UNIT.findall(unfraction(text))
+    if not found:
+        return None
+    value, unit = found[-1]
+    factor, _ = _unit_factor(unit, None)
+    return _to_float(value) * factor if factor else None
+
+
 def parse_length(text: str | None, default_unit: str | None = None) -> float | None:
     """One length ("4.2 m", "14 ft", "6'2\"", "250cm") -> metres."""
     if not text or not isinstance(text, str):

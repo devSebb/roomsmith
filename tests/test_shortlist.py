@@ -146,6 +146,29 @@ def test_a_piece_too_big_for_the_door_is_cautioned_not_dropped(shop):
     assert "would not go through the door" in row["why"] and "flat-packed" in row["why"]
 
 
+def test_a_floor_lamp_page_with_only_a_height_is_added_as_an_estimate(shop):
+    """Found live (IKEA uplighter): the name carries '72 "' and nothing else, and the add failed."""
+    svc, room, _ = shop
+    PAGES["uplighter"] = page('IKEA PS 2026 Floor uplighter - dark red 72 "', "59.99", None)
+    row = svc.shortlist(room, "lamp_floor", [U("uplighter")])["candidates"][0]
+    assert row["status"] == "ok" and row["size_estimated"] and row["verified"] is False and round(row["dimensions_m"][1], 2) == 1.83
+    assert "only the height" in row["why"]
+    r = svc.add_product(room, title="", url=U("uplighter")["url"], actor="agent")
+    assert r["ok"] and "estimate" in r["size_note"], r
+    obj = svc.scene(room)["scene"]["objects"][-1]
+    assert obj["category"] == "lamp_floor" and round(obj["dimensions_m"][1], 2) == 1.83 and obj["provenance"]["dims_source"] == "estimated"
+    assert obj["color"] == "#7a1f26" and obj["product"]["price_amount"] == 59.99
+
+
+def test_a_rug_named_only_in_its_title_is_a_rug_and_does_not_overlap_the_table_on_it(shop):
+    """Found live: 'SONGMICS HOME Area Rug, 5x7 ft' was not recognised and was reported as overlapping the coffee table."""
+    svc, room, _ = shop
+    svc.apply({"project_id": room, "operations": [{"op": "add_object", "name": "Coffee table", "category": "table_coffee", "place": {"centered_in_room": True}}]})
+    r = svc.add_product(room, title="SONGMICS HOME Area Rug, 5x7 ft", dimensions_m=[1.52, 0.01, 2.13], price="$69.99", category="other", place={"centered_in_room": True}, actor="agent")
+    assert r["ok"] and svc.scene(room)["scene"]["objects"][-1]["category"] == "rug"
+    assert not [i for i in svc.scene(room)["issues"] if i["code"] == "overlap"]
+
+
 def test_limits_duplicates_and_bad_input(shop):
     svc, room, calls = shop
     too_many = svc.shortlist(room, "desk", [U("small-desk")] * (SHORTLIST_MAX + 1))

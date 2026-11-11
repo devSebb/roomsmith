@@ -229,3 +229,9 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
   number of drawers, doors, tiers or cubes, ladder shelves, cube organisers,
   tripod and uplighter lamps, upholstered headboards, chaise sofas, stools. Being
   over budget no longer marks every product as a problem. 212 tests.
+- 2026-11-10 (late night, from a live Desktop session): a product's whole name now
+  says what it is ("SONGMICS HOME Area Rug, 5x7 ft" is a rug, "Queen bed frame" a
+  bed and not a picture frame, "TV stand" a stand and not a TV), so a rug no longer
+  reports an overlap with the table standing on it. A floor lamp whose page gives
+  only its height is added with that height on a typical base, marked as an
+  estimate, where the add used to fail. 215 tests.

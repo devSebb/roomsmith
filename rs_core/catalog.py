@@ -131,24 +131,55 @@ ALIASES = {
 }
 
 
+# Phrases in a product's name that say what it is, longest first. A product title is
+# often all the caller has ("SONGMICS HOME Area Rug, 5x7 ft", "TARVA Bed frame - pine Queen").
+PHRASES = {
+    "tv stand": "tv_stand", "tv console": "tv_stand", "tv cabinet": "tv_stand", "media stand": "tv_stand", "entertainment center": "tv_stand",
+    "area rug": "rug", "wall art": "picture", "art print": "picture", "canvas print": "picture", "framed print": "picture", "poster": "picture",
+    "floor mirror": "mirror", "wall mirror": "mirror", "book shelf": "bookshelf", "ladder shelf": "bookshelf", "ladder bookshelf": "bookshelf",
+    "storage organizer": "bookshelf", "cube organizer": "bookshelf", "cube storage": "bookshelf",
+    "desk chair": "chair", "task chair": "chair", "accent chair": "armchair", "arm chair": "armchair", "club chair": "armchair", "wingback": "armchair",
+    "bar stool": "stool", "counter stool": "stool", "storage bench": "bench", "nesting table": "table_coffee", "console table": "table_side",
+    "writing desk": "desk", "standing desk": "desk", "computer desk": "desk", "uplighter": "lamp_floor", "torchiere": "lamp_floor",
+    "floor uplighter": "lamp_floor", "arc lamp": "lamp_floor", "tripod lamp": "lamp_floor", "desk lamp": "lamp_table", "bedside lamp": "lamp_table",
+    "love seat": "loveseat", "sofa bed": "sofa", "futon": "sofa", "daybed": "bed_single", "chest": "dresser", "credenza": "sideboard", "buffet": "sideboard",
+    "plant": "plant", "planter": "plant", "tree": "plant",
+}
+_BED_SIZES = (("bed_king", ("king",)), ("bed_queen", ("queen",)), ("bed_double", ("full", "double")), ("bed_single", ("twin", "single")))
+
+
 def normalize_category(category: str | None) -> str:
+    """A catalog category from a category word or from a product's whole name."""
     if not category:
         return "other"
     key = str(category).strip().lower().replace("-", "_")
     if key in CATALOG:
         return key
-    spaced = key.replace("_", " ")
+    spaced = " ".join("".join(ch if ch.isalnum() else " " for ch in key).split())
     if spaced in ALIASES:
         return ALIASES[spaced]
-    if key.replace("_", " ") in CATALOG:
-        return key.replace("_", " ")
-    # try the last word ("leather sofa" -> "sofa")
-    for token in reversed(spaced.split()):
+    if spaced in CATALOG:
+        return spaced
+    words = spaced.split()
+    singular = [w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w for w in words]
+    text = " " + " ".join(singular) + " "
+    # a bed is a bed whatever else its name mentions ("bed frame" must not become a picture frame)
+    if " bed " in text or " bedframe " in text:
+        for cat, size_words in _BED_SIZES:
+            if any(f" {w} " in text for w in size_words):
+                return cat
+        return "bed"
+    phrases = {**ALIASES, **PHRASES}
+    for phrase in sorted((k for k in phrases if " " in k), key=len, reverse=True):
+        if f" {phrase} " in text:
+            return phrases[phrase]
+    # then the last word that names something ("leather sofa" -> "sofa")
+    for token in reversed(singular):
         if token in CATALOG:
             return token
-        if token in ALIASES:
-            return ALIASES[token]
-    return "other"
+        if token in phrases and token != "frame":
+            return phrases[token]
+    return "picture" if "frame" in singular else "other"
 
 
 def spec_for(category: str | None) -> CategorySpec:

@@ -237,3 +237,17 @@ def test_a_unit_printed_once_applies_to_the_labelled_values_beside_it():
     assert [round(c[k], 2) for k in ("width_m", "depth_m", "height_m")] == [0.7, 0.7, 0.88]
     m = dims.parse_dimensions("Width: 180 cm, Depth: 88, Height: 76", category="sofa")
     assert [round(m[k], 2) for k in ("width_m", "depth_m", "height_m")] == [1.8, 0.88, 0.76]
+
+
+def test_product_names_say_what_the_thing_is():
+    from rs_core.catalog import normalize_category as n
+    from rs_core import dims
+
+    cases = {"SONGMICS HOME Area Rug, 5x7 ft": "rug", "Queen bed frame": "bed_queen", "TARVA Bed frame - pine Queen": "bed_queen", "TV stand": "tv_stand",
+             "Draper Mid Century Low TV Stand": "tv_stand", "IKEA PS 2026 Floor uplighter, dark red": "lamp_floor", "Wall art print, framed": "picture",
+             "6-Shelf Ladder Bookshelf Oak Matte Black": "bookshelf", "Nightstands (set of 2)": "nightstand", "Counter Stool, walnut": "stool",
+             "leather sofa": "sofa", "picture frame": "picture", "drawers": "dresser", "bedding set": "other", "lamp_floor": "lamp_floor"}
+    for name, want in cases.items():
+        assert n(name) == want, (name, n(name))
+    assert round(dims.length_with_unit('IKEA PS 2026 Floor uplighter - dark red 72 "'), 2) == 1.83
+    assert dims.length_with_unit("Model 2026 lamp") is None and round(dims.length_with_unit("Height 150 cm, model 3000"), 2) == 1.5
