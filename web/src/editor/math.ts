@@ -193,3 +193,27 @@ export const fmt = (v: number, digits = 2) => {
 export const cm = (v: number) => `${Math.round(v * 100)} cm`
 export const deg = (r: number) => Math.round((r * 180) / Math.PI)
 export const rad = (d: number) => (d * Math.PI) / 180
+
+/** "USD 1,899" / "USD 249.50" — the same form the backend prints. */
+export const money = (amount: number, currency?: string | null) => {
+  const cents = Math.round(amount * 100)
+  const whole = cents % 100 === 0
+  const body = (cents / 100).toLocaleString('en-US', { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 })
+  return currency ? `${currency} ${body}` : body
+}
+
+/** Geometry and wording of the budget bar. `fill` and `tick` are 0..1 of the bar's width;
+ *  `tick` (where the kept-back part starts) is null when the user set no buffer. */
+export function budgetBar(b: { limit: number; currency: string | null; reserve: number; spent: number }) {
+  const limit = Math.max(b.limit, 0.01)
+  const over = b.spent > b.limit + 1e-9
+  const state: 'ok' | 'reserve' | 'over' = over ? 'over' : b.reserve > 0 && b.spent > b.limit - b.reserve + 1e-9 ? 'reserve' : 'ok'
+  const left = b.limit - b.spent
+  return {
+    fill: Math.min(1, Math.max(0, b.spent / limit)),
+    tick: b.reserve > 0 ? Math.min(1, Math.max(0, (b.limit - b.reserve) / limit)) : null,
+    state,
+    text: `${money(b.spent, b.currency)} of ${money(b.limit)}`,
+    left: over ? `${money(-left, b.currency)} over` : `${money(left)} left`,
+  }
+}

@@ -45,6 +45,16 @@ export const CSS = `
 .rs-item .rs-dim{color:var(--rs-faint);font-size:11px;white-space:nowrap}
 .rs-issue{padding:6px 8px;border-left:3px solid var(--rs-warn);background:var(--rs-softer);border-radius:0 6px 6px 0;cursor:pointer;font-size:12px}
 .rs-issue.info{border-left-color:var(--rs-faint);color:var(--rs-muted)}
+.rs-budget{padding:8px 10px 7px;border-bottom:1px solid var(--rs-line);display:flex;flex-direction:column;gap:5px;cursor:pointer}
+.rs-budget .rs-bline{display:flex;justify-content:space-between;gap:8px;font-size:12px;white-space:nowrap}
+.rs-budget .rs-bline b{font-weight:600}
+.rs-budget .rs-track{position:relative;height:6px;border-radius:3px;background:var(--rs-soft);overflow:hidden}
+.rs-budget .rs-fill{position:absolute;inset:0 auto 0 0;border-radius:3px;background:var(--rs-ok);transition:width .5s ease,background .3s}
+.rs-budget.reserve .rs-fill{background:var(--rs-warn)}
+.rs-budget.over .rs-fill{background:var(--rs-bad)}
+.rs-budget.over .rs-left{color:var(--rs-bad);font-weight:600}
+.rs-budget .rs-tick{position:absolute;top:0;bottom:0;width:2px;background:currentColor;opacity:.55}
+.rs-item .rs-price{color:var(--rs-muted);font-size:11px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .rs-muted{color:var(--rs-muted);font-size:12px}
 .rs-faint{color:var(--rs-faint);font-size:11px}
 .rs-badge{display:inline-block;padding:1px 6px;border-radius:9px;font-size:10px;background:var(--rs-soft);color:var(--rs-muted)}

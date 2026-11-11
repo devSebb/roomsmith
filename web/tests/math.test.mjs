@@ -87,3 +87,20 @@ test('formatting helpers', () => {
   assert.equal(m.cm(0.123), '12 cm')
   assert.equal(m.deg(Math.PI), 180)
 })
+
+test('money prints like the backend', () => {
+  assert.equal(m.money(1899, 'USD'), 'USD 1,899')
+  assert.equal(m.money(249.5, 'USD'), 'USD 249.50')
+  assert.equal(m.money(0.1 + 0.2), '0.30')
+})
+
+test('budget bar: share spent, where the buffer starts, and the three states', () => {
+  let b = m.budgetBar({ limit: 1000, currency: 'USD', reserve: 0, spent: 250 })
+  assert.deepEqual([b.fill, b.tick, b.state, b.text, b.left], [0.25, null, 'ok', 'USD 250 of 1,000', '750 left'])
+  b = m.budgetBar({ limit: 1000, currency: 'USD', reserve: 100, spent: 950 })
+  assert.deepEqual([b.fill, b.tick, b.state], [0.95, 0.9, 'reserve'])
+  b = m.budgetBar({ limit: 1000, currency: 'USD', reserve: 0, spent: 1000 })
+  assert.equal(b.state, 'ok') // exactly on the limit is not over
+  b = m.budgetBar({ limit: 1000, currency: 'USD', reserve: 0, spent: 1140 })
+  assert.deepEqual([b.fill, b.state, b.left], [1, 'over', 'USD 140 over'])
+})

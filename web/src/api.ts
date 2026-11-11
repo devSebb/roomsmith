@@ -1,6 +1,6 @@
 // One tiny client; each shell supplies a transport (SDK.fetchJSON, ctx.rest, or fetch).
 
-import type { ApplyResult, Head, Issue, Op, ProjectRow, Revision, Scene } from './types'
+import type { ApplyResult, BudgetStatus, Head, Issue, Op, ProjectRow, Revision, Scene } from './types'
 
 export interface Transport {
   // path is namespace-relative: "/projects", "/projects/x/head", ...
@@ -37,7 +37,7 @@ export class Api {
     const q = `after=${after}&timeout=${timeout}` + (active ? `&active=${encodeURIComponent(active)}` : '')
     return this.t.json<Head & { ok: boolean; changed: boolean; active_project_id?: string | null; active_changed?: boolean }>(`/projects/${id}/wait?${q}`, { timeoutMs: (timeout + 10) * 1000 }).then(check)
   }
-  scene(id: string) { return this.t.json<{ ok: boolean; revision: number; scene: Scene; issues: Issue[]; can_undo: boolean; can_redo: boolean; head: Head }>(`/projects/${id}/scene`).then(check) }
+  scene(id: string) { return this.t.json<{ ok: boolean; revision: number; scene: Scene; issues: Issue[]; budget?: BudgetStatus | null; can_undo: boolean; can_redo: boolean; head: Head }>(`/projects/${id}/scene`).then(check) }
   history(id: string, limit = 30) { return this.t.json<{ ok: boolean; revisions: Revision[]; can_undo: boolean; can_redo: boolean }>(`/projects/${id}/history?limit=${limit}`).then(check) }
   apply(id: string, operations: Op[], expectedRevision?: number, commandId?: string) {
     return this.t.json<ApplyResult>(`/projects/${id}/commands`, { method: 'POST', body: { operations, expected_revision: expectedRevision, command_id: commandId, actor: 'user' } })
@@ -46,6 +46,11 @@ export class Api {
   redo(id: string) { return this.t.json<any>(`/projects/${id}/redo`, { method: 'POST', body: {} }) }
   check(id: string, body: Record<string, unknown>) { return this.t.json<any>(`/projects/${id}/check`, { method: 'POST', body }).then(check) }
   addProduct(id: string, body: Record<string, unknown>) { return this.t.json<any>(`/projects/${id}/products`, { method: 'POST', body }) }
+  /** Tell the backend what is selected, so Hermes knows what "this" means. A hint: failures are ignored. */
+  setSelection(id: string, kind: 'object' | 'opening' | 'wall' | null, selected: string | null) {
+    return this.t.json<any>(`/projects/${id}/selection`, { method: 'POST', body: { kind, id: selected } })
+  }
+  shortlist(id: string, body: Record<string, unknown>) { return this.t.json<any>(`/projects/${id}/shortlist`, { method: 'POST', body, timeoutMs: 60000 }) }
   uploadPhoto(bytes: Uint8Array, contentType: string, projectId?: string) {
     return this.t.upload<{ ok: boolean; photo_id: string }>(`/photos${projectId ? `?project_id=${projectId}` : ''}`, bytes, contentType).then(check)
   }

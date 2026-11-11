@@ -4,7 +4,7 @@
 
 import { Api, ApiError } from './api'
 export { ApiError } // so tests against the bundled store can raise the same class
-import type { Head, Issue, Op, ProjectRow, Revision, Scene } from './types'
+import type { BudgetStatus, Head, Issue, Op, ProjectRow, Revision, Scene } from './types'
 
 export interface Toast { id: number; kind: 'info' | 'warn' | 'error' | 'agent'; text: string; ids?: string[] }
 
@@ -14,6 +14,7 @@ export interface State {
   scene: Scene | null
   revision: number
   issues: Issue[]
+  budget: BudgetStatus | null
   canUndo: boolean
   canRedo: boolean
   head: Head | null
@@ -35,7 +36,7 @@ const uuid = () => (typeof globalThis.crypto?.randomUUID === 'function' ? crypto
 
 export class Store {
   state: State = {
-    projects: [], projectId: null, scene: null, revision: 0, issues: [], canUndo: false, canRedo: false, head: null, history: [],
+    projects: [], projectId: null, scene: null, revision: 0, issues: [], budget: null, canUndo: false, canRedo: false, head: null, history: [],
     selectedId: null, selectedOpeningId: null, selectedWallId: null, loading: false, error: null, toasts: [], online: true, lastAgentChange: null,
   }
   private listeners = new Set<Listener>()
@@ -88,7 +89,7 @@ export class Store {
     this.persist?.set('projectId', projectId)
     try {
       const r = await this.api.scene(projectId)
-      this.set({ scene: r.scene, revision: r.revision, issues: r.issues, canUndo: r.can_undo, canRedo: r.can_redo, head: r.head, loading: false, error: null, online: true })
+      this.set({ scene: r.scene, revision: r.revision, issues: r.issues, budget: r.budget || null, canUndo: r.can_undo, canRedo: r.can_redo, head: r.head, loading: false, error: null, online: true })
       this.loadHistory()
       this.startPolling()
     } catch (e: any) {
@@ -160,7 +161,7 @@ export class Store {
     const r = await this.api.scene(pid)
     const prevRev = this.state.revision
     const head = r.head
-    this.set({ scene: r.scene, revision: r.revision, issues: r.issues, canUndo: r.can_undo, canRedo: r.can_redo, head })
+    this.set({ scene: r.scene, revision: r.revision, issues: r.issues, budget: r.budget || null, canUndo: r.can_undo, canRedo: r.can_redo, head })
     if (head.revision > prevRev && head.actor === 'agent') {
       const summary = head.summary.replace(/^Hermes: /, '')
       this.set({ lastAgentChange: { revision: head.revision, summary, ids: head.changed_ids } })
@@ -175,9 +176,21 @@ export class Store {
 
   // ------------------------------------------------------------ editing
 
-  select(id: string | null) { if (id !== this.state.selectedId) this.set({ selectedId: id, selectedOpeningId: id ? null : this.state.selectedOpeningId }) }
-  selectOpening(id: string | null) { this.set({ selectedOpeningId: id, selectedId: id ? null : this.state.selectedId }) }
-  selectWall(id: string | null) { this.set({ selectedWallId: id }) }
+  select(id: string | null) { if (id !== this.state.selectedId) { this.set({ selectedId: id, selectedOpeningId: id ? null : this.state.selectedOpeningId }); this.reportSelection() } }
+  selectOpening(id: string | null) { this.set({ selectedOpeningId: id, selectedId: id ? null : this.state.selectedId }); this.reportSelection() }
+  selectWall(id: string | null) { this.set({ selectedWallId: id }); this.reportSelection() }
+
+  private selectionTimer: ReturnType<typeof setTimeout> | null = null
+  /** Debounced: tell the backend what is selected so Hermes knows what "this" means. */
+  private reportSelection() {
+    if (this.selectionTimer) clearTimeout(this.selectionTimer)
+    this.selectionTimer = setTimeout(() => {
+      const { projectId: pid, selectedId, selectedOpeningId, selectedWallId } = this.state
+      if (!pid || this.disposed) return
+      const [kind, id] = selectedId ? ['object', selectedId] as const : selectedOpeningId ? ['opening', selectedOpeningId] as const : selectedWallId ? ['wall', selectedWallId] as const : [null, null] as const
+      this.api.setSelection(pid, kind, id).catch(() => { /* a hint, never an error */ })
+    }, 400)
+  }
 
   /** Apply operations. Optimistic: `optimistic(scene)` mutates a copy that is shown at once. */
   async apply(ops: Op[], optimistic?: (scene: Scene) => void, opts: { silent?: boolean } = {}) {
@@ -267,7 +280,7 @@ export class Store {
       this.pollAbort++; this.polling = false
       const r = await this.refreshProjects()
       const next = r?.active_project_id || r?.projects[0]?.project_id || null
-      if (next) await this.open(next); else this.set({ projectId: null, scene: null, revision: 0, issues: [], history: [] })
+      if (next) await this.open(next); else this.set({ projectId: null, scene: null, revision: 0, issues: [], budget: null, history: [] })
     } catch (e: any) { this.toast('error', friendly(e)) }
   }
 

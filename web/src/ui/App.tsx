@@ -1,10 +1,10 @@
 import React from 'react'
 import type { Api } from '../api'
 import { Editor, type ViewMode } from '../editor/editor'
-import { cm, deg, fmt, rad, wallLength } from '../editor/math'
+import { budgetBar, cm, deg, fmt, money, rad, wallLength } from '../editor/math'
 import type { Theme } from '../editor/three-scene'
 import { Store, type State } from '../store'
-import type { Issue, Opening, Scene, SceneObject, Wall } from '../types'
+import type { BudgetStatus, Issue, Opening, Scene, SceneObject, Wall } from '../types'
 import { CSS } from './styles'
 
 export interface AppProps {
@@ -129,6 +129,7 @@ export function App(props: AppProps) {
           <button className={tab === 'history' ? 'on' : ''} onClick={() => setTab('history')}>History</button>
           <button className={tab === 'add' ? 'on' : ''} onClick={() => setTab('add')}>Add</button>
         </div>
+        {scene && s.budget && <BudgetBar b={s.budget} onClick={() => setTab('room')} />}
         <div className="rs-body">
           {!scene && <div className="rs-muted">Open or create a room to start.</div>}
           {scene && tab === 'objects' && (selected ? <ObjectInspector store={store} scene={scene} o={selected} openExternal={props.openExternal} /> : <ObjectList store={store} scene={scene} issues={s.issues} onFocus={id => ed?.focus(id)} />)}
@@ -212,11 +213,56 @@ function ObjectList({ store, scene, issues, onFocus }: { store: Store; scene: Sc
           <span className="rs-sw" style={{ background: o.color }} />
           <span className="rs-name">{o.name}{o.locked ? ' 🔒' : ''}</span>
           {bad.has(o.id) && <span className="rs-badge warn">!</span>}
+          {o.product && (o.product.price_amount ? <span className="rs-price">{money(o.product.price_amount, o.product.price_currency)}</span> : <span className="rs-price" title="No price known: not in the total. Select it to type one.">no price</span>)}
           <span className="rs-dim">{fmt(o.dimensions_m[0])}×{fmt(o.dimensions_m[2])}</span>
         </div>
       ))}
     </div>
   )
+}
+
+function BudgetBar({ b, onClick }: { b: BudgetStatus; onClick: () => void }) {
+  const bar = budgetBar(b)
+  const extra = [b.reserve > 0 ? `${money(b.reserve)} kept back` : '', b.unpriced.length ? `${b.unpriced.length} without a price` : '', b.other_currency.length ? `${b.other_currency.length} in another currency` : ''].filter(Boolean).join(' · ')
+  return (
+    <div className={'rs-budget ' + bar.state} onClick={onClick} title={b.text + ' — click to change the budget'}>
+      <div className="rs-bline"><span>Budget <b>{bar.text}</b></span><span className="rs-left">{bar.left}</span></div>
+      <div className="rs-track"><div className="rs-fill" style={{ width: `${bar.fill * 100}%` }} />{bar.tick !== null && <div className="rs-tick" style={{ left: `${bar.tick * 100}%` }} />}</div>
+      {extra && <div className="rs-faint">{extra}</div>}
+    </div>
+  )
+}
+
+function BudgetFields({ store, scene }: { store: Store; scene: Scene }) {
+  const b = scene.budget || null
+  const [limit, setLimit] = React.useState(b ? String(b.limit) : '')
+  const [currency, setCurrency] = React.useState(b?.currency || 'USD')
+  const [reserve, setReserve] = React.useState(b && b.reserve ? String(b.reserve) : '')
+  React.useEffect(() => { setLimit(b ? String(b.limit) : ''); setCurrency(b?.currency || 'USD'); setReserve(b && b.reserve ? String(b.reserve) : '') }, [b?.limit, b?.currency, b?.reserve])
+  const save = () => {
+    const op: Record<string, unknown> = { op: 'set_budget', limit: limit.trim(), currency: currency.trim() || undefined }
+    if (reserve.trim()) op.reserve = reserve.trim()
+    store.apply([op as any])
+  }
+  return (
+    <>
+      <h4>Budget</h4>
+      <div className="rs-row"><input className="rs-in num" placeholder="Amount" value={limit} onChange={e => setLimit(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && limit.trim()) save() }} /><input className="rs-in" style={{ maxWidth: 64 }} placeholder="USD" value={currency} maxLength={3} onChange={e => setCurrency(e.target.value.toUpperCase())} /></div>
+      <div className="rs-row"><input className="rs-in" placeholder="Keep back (optional)" value={reserve} onChange={e => setReserve(e.target.value)} />
+        <button className="rs-btn sm primary" disabled={!limit.trim()} onClick={save}>{b ? 'Update' : 'Set'}</button>
+        {b && <button className="rs-btn sm" onClick={() => store.apply([{ op: 'clear_budget' }])}>Remove</button>}
+      </div>
+      <div className="rs-faint">{b ? 'Products with a price count toward it. Going over is shown, never blocked.' : 'Optional. Or tell Hermes: “furnish this for under 1,500”.'}</div>
+    </>
+  )
+}
+
+function PriceField({ store, o }: { store: Store; o: SceneObject }) {
+  const p = o.product!
+  const [v, setV] = React.useState(p.price || '')
+  React.useEffect(() => setV(p.price || ''), [o.id, p.price])
+  const commit = () => { if (v.trim() !== (p.price || '')) store.apply([{ op: 'update_object', id: o.id, product: { price: v.trim() || null } }]) }
+  return <div className="rs-row"><label>Price</label><input className="rs-in" placeholder="e.g. $249" value={v} onChange={e => setV(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} /></div>
 }
 
 function NumField({ label, value, onCommit, step = 0.01, min, max, unit = 'm' }: { label: string; value: number; onCommit: (v: number) => void; step?: number; min?: number; max?: number; unit?: string }) {
@@ -268,12 +314,13 @@ function ObjectInspector({ store, scene, o, openExternal }: { store: Store; scen
           {p.image_url ? <img src={p.image_url} alt="" referrerPolicy="no-referrer" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} /> : null}
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 600 }}>{p.title}</div>
-            {p.price && <div className="rs-muted">{p.price}</div>}
+            {p.price_amount ? <div className="rs-muted">{money(p.price_amount, p.price_currency)}</div> : null}
             {p.dimensions_text && <div className="rs-faint">{p.dimensions_text}{p.assumed_order ? ' (read as W×D×H)' : ''}</div>}
             {p.url && <a href={p.url} target="_blank" rel="noreferrer" onClick={e => { if (openExternal) { e.preventDefault(); openExternal(p.url!) } }}>Open product page ↗</a>}
           </div>
         </div>
       )}
+      {p && <PriceField store={store} o={o} />}
       {scene.calibration.status !== 'calibrated' && (
         <details className="rs-det"><summary>Calibrate: I know this object's real width</summary>
           <div className="rs-row" style={{ marginTop: 6 }}><input className="rs-in num" placeholder="m" value={calib} onChange={e => setCalib(e.target.value)} /><button className="rs-btn sm primary" onClick={() => { const v = parseFloat(calib); if (v > 0) store.apply([{ op: 'calibrate', reference: { kind: 'object_width', id: o.id, real_m: v } }]) }}>Set scale</button></div>
@@ -317,6 +364,7 @@ function RoomPanel({ store, scene, opening, wallId, api, openExternal, editor }:
       <NumField label="Height" value={scene.room.height_m} onCommit={v => store.apply([{ op: 'set_room_height', height_m: v }])} />
       <div className="rs-row"><label>Floor</label><input type="color" className="rs-color" value={scene.room.floor.color} onChange={e => store.apply([{ op: 'set_surface_color', surface: 'floor', color: e.target.value }], s => { s.room.floor.color = e.target.value })} />
         <label>Walls</label><input type="color" className="rs-color" value={scene.room.walls[0]?.color || '#f2efe9'} onChange={e => store.apply([{ op: 'set_surface_color', surface: 'walls', color: e.target.value }], s => { s.room.walls.forEach(w => (w.color = e.target.value)) })} /></div>
+      <BudgetFields store={store} scene={scene} />
       <h4>Walls</h4>
       <div className="rs-list">
         {scene.room.walls.map(w => (
