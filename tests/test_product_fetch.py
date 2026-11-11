@@ -161,7 +161,7 @@ def test_product_color_is_the_photo_s_dominant_colour():
     import pytest
 
     PIL = pytest.importorskip("PIL.Image")
-    from rs_core.service import product_color
+    from rs_core.media import product_color
 
     im = PIL.new("RGB", (40, 40), (255, 255, 255))  # studio white
     for x in range(8, 32):

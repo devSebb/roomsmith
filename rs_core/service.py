@@ -8,7 +8,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import shutil
 import time
 import uuid
 from pathlib import Path
@@ -17,7 +16,7 @@ from typing import Any
 from rs_core import dims as dims_mod
 from rs_core import product_fetch
 from rs_core import geometry as g
-from rs_core import export_glb, fitcheck, layout, ops, summarize, validate
+from rs_core import export_glb, fitcheck, layout, media, ops, summarize, validate
 from rs_core import model as m
 from rs_core.catalog import normalize_category
 from rs_core.model import SceneError
@@ -108,9 +107,12 @@ class RoomService:
                 scene, notes = layout.build_scene(pid, name, draft)
                 summary = f"Created '{name}' from a draft with {len(scene['objects'])} objects"
             else:
-                w = float(width_m) if width_m is not None else m.DEFAULT_ROOM["width_m"]
-                d = float(depth_m) if depth_m is not None else m.DEFAULT_ROOM["depth_m"]
-                h = float(height_m) if height_m is not None else m.DEFAULT_ROOM["height_m"]
+                try:
+                    w = float(width_m) if width_m is not None else m.DEFAULT_ROOM["width_m"]
+                    d = float(depth_m) if depth_m is not None else m.DEFAULT_ROOM["depth_m"]
+                    h = float(height_m) if height_m is not None else m.DEFAULT_ROOM["height_m"]
+                except (TypeError, ValueError):
+                    return _err("invalid_value", "width_m, depth_m and height_m must be numbers in metres")
                 for v, lo, hi, field in ((w, m.ROOM_SIDE_MIN, m.ROOM_SIDE_MAX, "width_m"), (d, m.ROOM_SIDE_MIN, m.ROOM_SIDE_MAX, "depth_m"), (h, m.ROOM_HEIGHT_MIN, m.ROOM_HEIGHT_MAX, "height_m")):
                     if not math.isfinite(v) or not (lo <= v <= hi):
                         return _err("out_of_range", f"{field} must be between {lo} and {hi} m", field=field)
@@ -291,7 +293,7 @@ class RoomService:
                 try:
                     scene, _rev = self.store.get_scene(pid, target)
                 except NotFound:
-                    # pruned; drop it and continue
+                    # that revision was pruned from history: nothing further to step to
                     break
                 head = self.store.head(pid)
                 label = "Undo" if mode == "undo" else "Redo"
@@ -338,7 +340,7 @@ class RoomService:
             if dimensions_m is not None:
                 # "would THIS (new size) fit where ob1 is?": test the new size in ob1's spot, ignoring ob1
                 try:
-                    dims = ops._dims(dimensions_m)  # noqa: SLF001 (same package)
+                    dims = ops.parse_dims(dimensions_m)
                 except SceneError as e:
                     return {"ok": False, "error": e.to_dict()}
                 replacing = obj
@@ -350,7 +352,7 @@ class RoomService:
                 name = obj["name"]
         elif dimensions_m is not None:
             try:
-                dims = ops._dims(dimensions_m)  # noqa: SLF001 (same package)
+                dims = ops.parse_dims(dimensions_m)
             except SceneError as e:
                 return {"ok": False, "error": e.to_dict()}
         base = {"ok": True, "project_id": pid, "revision": rev, "question": q}
@@ -427,7 +429,7 @@ class RoomService:
         if thumb:
             product["image_data"] = thumb
             if not color:
-                color = product_color(thumb)  # the stand-in wears the product's colour, not a category default
+                color = media.product_color(thumb)  # the stand-in wears the product's colour, not a category default
         op: dict = {
             "op": "add_object",
             "name": title[:60],
@@ -456,9 +458,7 @@ class RoomService:
             res["note"] = parsed["order_note"]
         return res
 
-    # ------------------------------------------------------------ photos
-
-    # ------------------------------------------------------------------ products from links
+    # ------------------------------------------------------------ products from links
 
     def read_product(self, url: str, category: str | None = None) -> dict:
         """Read a product page the user pasted: title, price, image, dimensions (if printed)."""
@@ -469,67 +469,36 @@ class RoomService:
             out["text"] = f"{out.get('title') or url}: no printed dimensions found on the page; ask the user for the size."
         return out
 
-    def product_thumbnail(self, image_url: str, max_px: int = 384, max_bytes: int = 120_000) -> str | None:
-        """Fetch a product image once and return a small data URL for the editor's stand-in
-        (cached on disk under products/). None when it cannot be fetched or shrunk enough."""
-        if not image_url or not str(image_url).startswith(("http://", "https://")):
-            return None
-        key = hashlib.sha256(image_url.encode()).hexdigest()[:16]
-        cache = self.data_dir / "products"
-        cache.mkdir(parents=True, exist_ok=True)
-        cached = cache / f"{key}.txt"
-        if cached.exists():
-            return cached.read_text() or None
-        try:
-            data, ctype, _ = product_fetch._get(image_url, timeout=10, accept="image/*")  # noqa: SLF001 (same package)
-        except product_fetch.FetchError:
-            return None
-        kind = sniff_image(data)
-        if kind is None:
-            return None
-        out_bytes, mime = data, {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}[kind]
-        try:
-            import io
+    def product_thumbnail(self, image_url: str) -> str | None:
+        return media.product_thumbnail(image_url, self.data_dir / "products")
 
-            from PIL import Image
+    # ------------------------------------------------------------ photos
 
-            im = Image.open(io.BytesIO(data)).convert("RGBA")
-            bg = Image.new("RGBA", im.size, (255, 255, 255, 255))  # product shots often have a transparent background
-            bg.alpha_composite(im)
-            im = bg.convert("RGB")
-            im.thumbnail((max_px, max_px))
-            buf = io.BytesIO()
-            im.save(buf, format="JPEG", quality=82)
-            out_bytes, mime = buf.getvalue(), "image/jpeg"
-        except Exception:  # noqa: BLE001 - no Pillow or odd image: keep the original if it is small
-            pass
-        if len(out_bytes) > max_bytes:
-            cached.write_text("")
-            return None
-        import base64
-
-        url = f"data:{mime};base64," + base64.b64encode(out_bytes).decode("ascii")
-        cached.write_text(url)
-        return url
-
-    def register_photo(self, source_path: str | Path, project_id: str | None = None, photo_id: str | None = None) -> dict:
-        """Copy an image into the data folder and record it. No decoding here."""
-        src = Path(source_path).expanduser()
-        if not src.is_file():
-            return _err("not_found", f"No file at {src}")
-        data = src.read_bytes()
-        if len(data) > 15 * 1024 * 1024:
+    def save_photo_bytes(self, data: bytes, project_id: str | None = None, photo_id: str | None = None) -> dict:
+        """Store an image the user chose (by content type, size-capped) and record it."""
+        if not data:
+            return _err("missing_field", "Empty image")
+        if len(data) > media.MAX_PHOTO_BYTES:
             return _err("too_large", "Photos must be under 15 MB")
-        kind = sniff_image(data)
+        kind = media.sniff_image(data)
         if kind is None:
             return _err("unsupported_format", "Only JPEG, PNG and WebP photos are supported (HEIC is not yet).")
         sha = hashlib.sha256(data).hexdigest()
         pid = photo_id or ("p" + sha[:12])
         dest = self.data_dir / "photos" / f"{pid}.{kind}"
         if not dest.exists():
-            shutil.copyfile(src, dest)
+            dest.write_bytes(data)
         row = self.store.add_photo(pid, str(dest), sha, None, None, project_id)
-        return {"ok": True, "photo_id": pid, "file": row["file"], "sha256": sha, "format": kind}
+        return {"ok": True, "photo_id": pid, "file": row["file"], "sha256": sha, "format": kind, "bytes": len(data)}
+
+    def register_photo(self, source_path: str | Path, project_id: str | None = None, photo_id: str | None = None) -> dict:
+        """Read an image file the user named and store a copy in the data folder."""
+        src = Path(source_path).expanduser()
+        if not src.is_file():
+            return _err("not_found", f"No file at {src}")
+        if src.stat().st_size > media.MAX_PHOTO_BYTES:
+            return _err("too_large", "Photos must be under 15 MB")
+        return self.save_photo_bytes(src.read_bytes(), project_id, photo_id)
 
     def photo_path(self, photo_id: str) -> Path | None:
         try:
@@ -546,41 +515,44 @@ class RoomService:
 
     # ------------------------------------------------------------ export
 
-    def export(self, project_id: str | None = None, fmt: str = "json", out_dir: str | Path | None = None) -> dict:
+    def _export_payload(self, project_id: str | None, fmt: str) -> tuple[bytes, str, str] | dict:
+        """(bytes, mime, filename) for one export format, or an error dict."""
         pid = self._resolve_project(project_id)
         if not pid:
             return self._no_project(project_id)
         scene, rev = self.store.get_scene(pid)
         fmt = (fmt or "json").lower()
         safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in scene["project"]["name"])[:40] or "room"
-        folder = Path(out_dir).expanduser() if out_dir else (self.data_dir / "exports")
-        folder.mkdir(parents=True, exist_ok=True)
-        if fmt == "json":
-            path = folder / f"{safe}-r{rev}.room.json"
-            path.write_text(json.dumps({"roomsmith": 1, "schema_version": scene["schema_version"], "revision": rev, "scene": scene}, indent=2))
-        elif fmt == "glb":
-            path = folder / f"{safe}-r{rev}.glb"
-            path.write_bytes(export_glb.scene_to_glb(scene))
-        elif fmt in ("summary", "txt", "text"):
-            path = folder / f"{safe}-r{rev}.txt"
-            issues = validate.issues(scene)
-            path.write_text(summarize.summary_text(scene, issues, rev) + "\n\n" + summarize.shopping_list(scene) + "\n")
-        else:
-            return _err("invalid_value", "format must be json, glb or summary")
-        return {"ok": True, "project_id": pid, "revision": rev, "format": fmt, "path": str(path), "bytes": path.stat().st_size}
-
-    def export_bytes(self, project_id: str | None, fmt: str) -> tuple[bytes, str, str] | dict:
-        pid = self._resolve_project(project_id)
-        if not pid:
-            return self._no_project(project_id)
-        scene, rev = self.store.get_scene(pid)
-        safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in scene["project"]["name"])[:40] or "room"
         if fmt == "glb":
             return export_glb.scene_to_glb(scene), "model/gltf-binary", f"{safe}-r{rev}.glb"
         if fmt == "json":
-            return json.dumps({"roomsmith": 1, "schema_version": scene["schema_version"], "revision": rev, "scene": scene}, indent=2).encode(), "application/json", f"{safe}-r{rev}.room.json"
-        issues = validate.issues(scene)
-        return (summarize.summary_text(scene, issues, rev) + "\n\n" + summarize.shopping_list(scene) + "\n").encode(), "text/plain", f"{safe}-r{rev}.txt"
+            body = json.dumps({"roomsmith": 1, "schema_version": scene["schema_version"], "revision": rev, "scene": scene}, indent=2)
+            return body.encode(), "application/json", f"{safe}-r{rev}.room.json"
+        if fmt in ("summary", "txt", "text"):
+            text = summarize.summary_text(scene, validate.issues(scene), rev) + "\n\n" + summarize.shopping_list(scene) + "\n"
+            return text.encode(), "text/plain", f"{safe}-r{rev}.txt"
+        return _err("invalid_value", "format must be json, glb or summary")
+
+    def export(self, project_id: str | None = None, fmt: str = "json") -> dict:
+        """Write an export into the plugin's own ``exports/`` folder and return its path.
+        The folder is fixed on purpose: callers (the model included) never choose where
+        the plugin writes."""
+        out = self._export_payload(project_id, fmt)
+        if isinstance(out, dict):
+            return out
+        data, _mime, filename = out
+        folder = self.data_dir / "exports"
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / filename
+        path.write_bytes(data)
+        return {"ok": True, "format": (fmt or "json").lower(), "path": str(path), "bytes": len(data)}
+
+    def export_bytes(self, project_id: str | None, fmt: str) -> tuple[bytes, str, str] | dict:
+        """The same export as bytes, for the editor's download."""
+        return self._export_payload(project_id, fmt)
+
+    def active_project_id(self) -> str | None:
+        return self.store.active_project_id()
 
     def import_json(self, payload: dict, name: str | None = None, actor: str = "user") -> dict:
         scene = payload.get("scene") if isinstance(payload, dict) and "scene" in payload else payload
@@ -622,29 +594,6 @@ class RoomService:
         return {"ok": True, "version": __version__, "schema_version": m.SCHEMA_VERSION, "store": self.store.stats(), "data_dir": str(self.data_dir)}
 
 
-def product_color(data_url: str) -> str | None:
-    """Dominant colour of a product photo as #rrggbb: the median of its non-background
-    pixels (white/near-white studio backgrounds and transparent areas ignored).
-    None without Pillow or when the photo is all background."""
-    try:
-        import base64
-        import io
-
-        from PIL import Image
-
-        raw = base64.b64decode(data_url.split(",", 1)[1])
-        im = Image.open(io.BytesIO(raw)).convert("RGB")
-        im.thumbnail((48, 48))
-        px = [p for p in im.getdata() if max(p) < 235 or (max(p) - min(p)) > 25]
-        if len(px) < 20:
-            return None
-        chans = [sorted(c[i] for c in px) for i in range(3)]
-        med = [chans[i][len(px) // 2] for i in range(3)]
-        return "#%02x%02x%02x" % tuple(med)
-    except Exception:  # noqa: BLE001 - a colour is a nicety
-        return None
-
-
 def _same_spot_as(scene: dict, obj: dict, new_dims: list[float]) -> dict:
     """Place instruction for 'where OBJ is' with a different size: against the same
     wall (same gap, centred where the old one was along it) when the old object stands
@@ -662,16 +611,6 @@ def _same_spot_as(scene: dict, obj: dict, new_dims: list[float]) -> dict:
         offset = max(0.0, min(m.wall_length(scene, wall) - float(new_dims[0]), along - float(new_dims[0]) / 2.0))
         return {"against_wall": wall["id"], "align": "left", "offset_m": round(offset, 3), "gap_m": round(gap, 3)}
     return {"position_m": list(obj["position_m"]), "yaw_deg": math.degrees(float(obj.get("yaw_rad", 0.0)))}
-
-
-def sniff_image(data: bytes) -> str | None:
-    if data[:3] == b"\xff\xd8\xff":
-        return "jpg"
-    if data[:8] == b"\x89PNG\r\n\x1a\n":
-        return "png"
-    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return "webp"
-    return None
 
 
 def new_command_id() -> str:

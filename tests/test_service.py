@@ -122,9 +122,9 @@ def test_add_product_parses_text(svc, room):
 
 def test_export_formats(svc, room, tmp_path):
     svc.apply({"project_id": room, "operations": [{"op": "add_object", "name": "Plant", "category": "plant"}]})
-    j = svc.export(room, "json", tmp_path / "out")
-    g = svc.export(room, "glb", tmp_path / "out")
-    t = svc.export(room, "summary", tmp_path / "out")
+    j = svc.export(room, "json")
+    g = svc.export(room, "glb")
+    t = svc.export(room, "summary")
     assert j["ok"] and g["ok"] and t["ok"]
     payload = json.loads(open(j["path"]).read())
     assert payload["scene"]["project"]["name"] == "Test room"

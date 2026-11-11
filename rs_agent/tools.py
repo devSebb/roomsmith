@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import json
 import threading
-import traceback
 from typing import Any, Callable
 
 from rs_agent import paths
@@ -59,10 +58,48 @@ def _guard(fn: Callable[[dict, dict], Any]) -> Callable[..., str]:
             out = fn(args, kwargs)
             return out if isinstance(out, str) else _dump(out)
         except Exception as e:  # noqa: BLE001 - tools must never raise
-            return _dump({"ok": False, "error": {"code": "internal", "message": f"{type(e).__name__}: {e}", "trace": traceback.format_exc(limit=3)}})
+            return _dump({"ok": False, "error": {"code": "internal", "message": f"{type(e).__name__}: {e}"}})
 
     wrapper.__name__ = fn.__name__
     return wrapper
+
+
+def _int(value: Any, default: int) -> int:
+    """A count from the model: 2, "2" or 2.0; anything else falls back to the default."""
+    try:
+        return max(1, int(float(value)))
+    except (TypeError, ValueError):
+        return default
+
+
+def _obj(value: Any) -> dict | None:
+    """An object argument, also accepted as a JSON string (some models send one)."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return None
+    return value if isinstance(value, dict) else None
+
+
+def _operations(value: Any) -> Any:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return value  # the service reports it as invalid
+    return [value] if isinstance(value, dict) else value
+
+
+def _without_image_data(scene: dict) -> dict:
+    """The full scene minus embedded product thumbnails (base64, tens of kilobytes each)."""
+    objects = []
+    for o in scene.get("objects", []):
+        product = o.get("product")
+        if isinstance(product, dict) and "image_data" in product:
+            o = {**o, "product": {k: v for k, v in product.items() if k != "image_data"}}
+        objects.append(o)
+    return {**scene, "objects": objects}
 
 
 def _trim_inspect(out: dict) -> dict:
@@ -74,7 +111,7 @@ def _trim_inspect(out: dict) -> dict:
     keep["objects"] = out.get("objects")
     keep["calibration"] = (out.get("calibration") or {}).get("status")
     if "scene" in out:
-        keep["scene"] = out["scene"]
+        keep["scene"] = _without_image_data(out["scene"])
     keep["editor_hint"] = EDITOR_HINT
     return keep
 
@@ -102,7 +139,7 @@ def projects(args: dict, kwargs: dict) -> dict:
 @_guard
 def new_room(args: dict, kwargs: dict) -> dict:
     svc = get_service()
-    layout = args.get("layout") if isinstance(args.get("layout"), dict) else None
+    layout = _obj(args.get("layout"))
     out = svc.create_project(args.get("name"), args.get("width_m"), args.get("depth_m"), args.get("height_m"), draft=layout, actor="agent")
     if out.get("ok") and args.get("photo_ids"):
         svc.attach_photos(out["project_id"], [str(p) for p in args["photo_ids"]])
@@ -124,9 +161,9 @@ def apply(args: dict, kwargs: dict) -> dict:
     command = {
         "project_id": args.get("project_id"),
         "expected_revision": args.get("expected_revision"),
-        "command_id": args.get("command_id") or new_command_id(),
+        "command_id": new_command_id(),
         "actor": "agent",
-        "operations": args.get("operations"),
+        "operations": _operations(args.get("operations")),
     }
     out = svc.apply(command)
     if out.get("ok"):
@@ -141,7 +178,7 @@ def check(args: dict, kwargs: dict) -> dict:
         args.get("project_id"),
         question=str(args.get("question") or "issues"),
         dimensions_m=args.get("dimensions_m"),
-        place=args.get("place") if isinstance(args.get("place"), dict) else None,
+        place=_obj(args.get("place")),
         opening_id=args.get("opening_id"),
         object_id=args.get("object_id"),
         name=str(args.get("name") or "candidate"),
@@ -161,7 +198,7 @@ def add_product(args: dict, kwargs: dict) -> dict:
         price=args.get("price"),
         category=args.get("category"),
         color=args.get("color"),
-        place=args.get("place") if isinstance(args.get("place"), dict) else None,
+        place=_obj(args.get("place")),
         expected_revision=args.get("expected_revision"),
         actor="agent",
         command_id=new_command_id(),
@@ -178,18 +215,18 @@ def read_product(args: dict, kwargs: dict) -> dict:
 def history(args: dict, kwargs: dict) -> dict:
     svc = get_service()
     action = str(args.get("action") or "list").lower()
-    steps = int(args.get("steps") or 1)
+    steps = _int(args.get("steps"), 1)
     if action == "undo":
         return _trim_inspect(svc.undo(args.get("project_id"), steps, actor="agent"))
     if action == "redo":
         return _trim_inspect(svc.redo(args.get("project_id"), steps, actor="agent"))
-    return svc.history(args.get("project_id"), limit=int(args.get("limit") or 10))
+    return svc.history(args.get("project_id"), limit=_int(args.get("limit"), 10))
 
 
 @_guard
 def export(args: dict, kwargs: dict) -> dict:
     svc = get_service()
-    return svc.export(args.get("project_id"), fmt=str(args.get("format") or "glb"), out_dir=args.get("out_dir"))
+    return svc.export(args.get("project_id"), fmt=str(args.get("format") or "glb"))
 
 
 def from_photo_handler(ctx_getter: Callable[[], Any]) -> Callable[..., str]:

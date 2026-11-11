@@ -32,6 +32,14 @@ def _get_ctx():
     return _ctx
 
 
+def _first_sentence(text: str, limit: int = 160) -> str:
+    """A one-line label for tool lists; the model reads the full schema description."""
+    head = text.split("\n", 1)[0]
+    cut = head.find(". ")
+    head = head[: cut + 1] if 0 < cut < limit else head
+    return head if len(head) <= limit else head[: limit - 1].rsplit(" ", 1)[0] + "…"
+
+
 def register(ctx) -> None:
     global _ctx
     _ctx = ctx
@@ -54,7 +62,7 @@ def register(ctx) -> None:
             toolset=schemas.TOOLSET,
             schema=spec,
             handler=handlers[spec["name"]],
-            description=spec["description"][:160],
+            description=_first_sentence(spec["description"]),
             emoji="🛋️",
         )
 

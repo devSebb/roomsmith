@@ -17,13 +17,15 @@ when no dimensions are printed, ``dims`` is None and the caller asks the user.
 
 from __future__ import annotations
 
-import gzip
 import html
+import ipaddress
 import json
 import re
+import socket
 import urllib.error
 import urllib.parse
 import urllib.request
+import zlib
 from html.parser import HTMLParser
 from typing import Any
 
@@ -50,17 +52,92 @@ class FetchError(Exception):
 # ------------------------------------------------------------------ HTTP
 
 
-def _get(url: str, timeout: float = TIMEOUT_S, accept: str = "text/html,application/json;q=0.9,*/*;q=0.5") -> tuple[bytes, str, str]:
-    """Return (body, content_type, final_url). Raises FetchError."""
+def _public_ip(text: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(text)
+    except ValueError:
+        return False
+    mapped = getattr(ip, "ipv4_mapped", None)
+    if mapped is not None:
+        ip = mapped
+    # is_global excludes loopback, private, link-local, shared (100.64/10), reserved, multicast, unspecified
+    return bool(ip.is_global) and not ip.is_multicast
+
+
+def check_url(url: str) -> str:
+    """Syntactic check: a full http(s) URL whose host is not obviously private. No DNS here."""
+    u = (url or "").strip()
+    try:
+        p = urllib.parse.urlparse(u)
+        host = (p.hostname or "").rstrip(".").lower()
+    except ValueError:
+        raise FetchError("bad_url", "Give a full http(s) product URL") from None
+    if p.scheme not in ("http", "https") or not host:
+        raise FetchError("bad_url", "Give a full http(s) product URL")
+    literal: str | None = None
+    try:
+        literal = str(ipaddress.ip_address(host.strip("[]")))
+    except ValueError:
+        try:  # "2130706433", "0x7f.1", "127.1": forms the resolver reads as an IPv4 address
+            literal = str(ipaddress.ip_address(socket.inet_aton(host)))
+        except OSError:
+            pass
+    if literal is not None and not _public_ip(literal):
+        raise FetchError("bad_url", "Only public product pages can be read")
+    if host == "localhost" or host.endswith((".localhost", ".local", ".internal", ".lan", ".home.arpa")):
+        raise FetchError("bad_url", "Only public product pages can be read")
+    return u
+
+
+def _assert_public(url: str) -> None:
+    """Resolve the host and refuse unless every address it maps to is public.
+    Called for the first request and again for every redirect hop."""
+    check_url(url)
+    p = urllib.parse.urlparse(url)
+    try:
+        infos = socket.getaddrinfo(p.hostname, p.port or (443 if p.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
+    except OSError as e:
+        raise FetchError("unreachable", f"Could not resolve the site: {e}") from e
+    if not infos or not all(_public_ip(info[4][0].split("%")[0]) for info in infos):
+        raise FetchError("bad_url", "Only public product pages can be read")
+
+
+class _PublicRedirects(urllib.request.HTTPRedirectHandler):
+    max_redirections = 5
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, PLR0913
+        _assert_public(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_PublicRedirects)
+
+
+def _gunzip_capped(data: bytes) -> bytes:
+    d = zlib.decompressobj(16 + zlib.MAX_WBITS)
+    out = d.decompress(data, MAX_BYTES + 1)
+    if d.unconsumed_tail:
+        raise FetchError("too_large", "The page is over 8 MB")
+    return out
+
+
+def http_get(url: str, timeout: float = TIMEOUT_S, accept: str = "text/html,application/json;q=0.9,*/*;q=0.5") -> tuple[bytes, str, str]:
+    """GET a public http(s) URL. Returns (body, content_type, final_url). Raises FetchError.
+
+    The host (and the host of every redirect) must resolve to public addresses only;
+    the body is capped at MAX_BYTES before and after decompression."""
+    _assert_public(url)
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": accept, "Accept-Language": "en", "Accept-Encoding": "gzip"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (http/https only, checked by caller)
+        with _OPENER.open(req, timeout=timeout) as resp:
             data = resp.read(MAX_BYTES + 1)
+            if len(data) > MAX_BYTES:
+                raise FetchError("too_large", "The page is over 8 MB")
             if resp.headers.get("Content-Encoding", "").lower() == "gzip":
                 try:
-                    data = gzip.decompress(data)
-                except OSError:
-                    pass
+                    data = _gunzip_capped(data)
+                except (OSError, EOFError, zlib.error):
+                    pass  # mislabelled or truncated: keep the bytes as sent
             if len(data) > MAX_BYTES:
                 raise FetchError("too_large", "The page is over 8 MB")
             return data, resp.headers.get("Content-Type", ""), resp.geturl()
@@ -70,19 +147,8 @@ def _get(url: str, timeout: float = TIMEOUT_S, accept: str = "text/html,applicat
         raise FetchError("http_error", f"HTTP {e.code} fetching the page") from e
     except urllib.error.URLError as e:
         raise FetchError("unreachable", f"Could not reach the site: {e.reason}") from e
-    except TimeoutError as e:
-        raise FetchError("timeout", "The site did not answer in time") from e
-
-
-def _check_url(url: str) -> str:
-    u = (url or "").strip()
-    p = urllib.parse.urlparse(u)
-    if p.scheme not in ("http", "https") or not p.netloc:
-        raise FetchError("bad_url", "Give a full http(s) product URL")
-    host = p.hostname or ""
-    if host in ("localhost", "127.0.0.1", "::1") or host.endswith(".local") or re.match(r"^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.)", host):
-        raise FetchError("bad_url", "Only public product pages can be read")
-    return u
+    except (TimeoutError, OSError, ValueError) as e:
+        raise FetchError("unreachable", f"Could not read the site: {type(e).__name__}") from e
 
 
 # ------------------------------------------------------------------ HTML
@@ -362,10 +428,10 @@ def _looks_like_challenge(body: bytes) -> bool:
 # ------------------------------------------------------------------ entry point
 
 
-def fetch_product(url: str, category: str | None = None, _get=_get) -> dict:
+def fetch_product(url: str, category: str | None = None, _get=http_get) -> dict:
     """Read one product page. Never raises for site problems: returns ok False with a code."""
     try:
-        url = _check_url(url)
+        url = check_url(url)
     except FetchError as e:
         return {"ok": False, "url": url, "error": {"code": e.code, "message": e.message}}
 

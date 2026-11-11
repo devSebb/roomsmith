@@ -2,12 +2,12 @@
 # Destination: NousResearch/hermes-agent → plugin-catalog/roomsmith.yaml (one-file PR).
 # Before opening the PR: replace <SHA> with the full 40-character commit of this
 # repo that passed CI, `hermes plugins doctor --ci` and `hermes plugins validate`;
-# the image/screenshot URLs pin to that same commit. See docs/ROOMSMITH_PLAN.md §16.
+# the image/screenshot URLs pin to that same commit. Pin with scripts/pin-catalog.py.
 name: roomsmith
 title: Roomsmith
 repo: https://github.com/devSebb/roomsmith
 sha: "<SHA>"
-description: "Turn a room photo into an editable 3D room that you and Hermes edit together. Drag furniture in a live editor inside Hermes Desktop or the dashboard, or tell Hermes what to change — both work on one saved room with undo, and the editor follows what Hermes does. Add products from a link as true-size stand-ins, ask whether they fit, export GLB/JSON. Photo reading goes through the Hermes model you already use (no extra accounts); sizes are estimates until you give one real measurement."
+description: "One 3D room that you and Hermes both edit, and it tells you whether things fit. Drag furniture in a live editor inside Hermes Desktop or the dashboard, or tell Hermes what to change: one saved room with undo, and each sees what the other did. Start from a photo or measurements, add products from a link at true size, ask whether they fit, export GLB/JSON. No accounts or keys. Network: only GETs to product links you paste (public addresses only). Photos go to your own Hermes model. Photo sizes are estimates until you give one real measurement."
 maintainer: devSebb
 tier: community
 category: desktop

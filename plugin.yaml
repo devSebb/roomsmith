@@ -1,6 +1,6 @@
 name: roomsmith
 version: 0.1.0
-description: Photo to editable 3D room. Edit by hand or by talking to Hermes, add products at true size, check what fits.
+description: One 3D room that you and Hermes both edit. Start from a photo or measurements, add real products at true size, check what fits.
 author: devSebb
 homepage: https://github.com/devSebb/roomsmith
 license: MIT

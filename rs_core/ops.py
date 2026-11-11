@@ -80,7 +80,7 @@ def _num(v: Any, field_name: str, lo: float | None = None, hi: float | None = No
     return f
 
 
-def _dims(v: Any, field_name: str = "dimensions_m") -> list[float]:
+def parse_dims(v: Any, field_name: str = "dimensions_m") -> list[float]:
     if isinstance(v, dict):
         try:
             v = [v["width_m"], v["height_m"], v["depth_m"]]
@@ -318,7 +318,7 @@ def op_remove_opening(scene: dict, op: dict) -> OpResult:
 def op_add_object(scene: dict, op: dict) -> OpResult:
     name = _str(op.get("name") or op.get("category") or "", "name")
     category = normalize_category(op.get("category") or name)
-    dims = _dims(op["dimensions_m"]) if "dimensions_m" in op else None
+    dims = parse_dims(op["dimensions_m"]) if "dimensions_m" in op else None
     provenance = op.get("provenance") if isinstance(op.get("provenance"), dict) else None
     if dims is None:
         provenance = dict(provenance or {})
@@ -473,7 +473,7 @@ def op_update_object(scene: dict, op: dict) -> OpResult:
         obj["provenance"] = {**obj.get("provenance", {}), **fields["provenance"]}
         changed.append("provenance")
     if "dimensions_m" in fields:
-        obj["dimensions_m"] = _dims(fields["dimensions_m"])
+        obj["dimensions_m"] = parse_dims(fields["dimensions_m"])
         obj.setdefault("provenance", {})["dims_source"] = str(fields.get("dims_source", "stated"))
         changed.append("size")
     what = ", ".join(changed) if changed else "nothing"
@@ -485,7 +485,7 @@ def op_set_dimensions(scene: dict, op: dict) -> OpResult:
     obj = m.find_object(scene, str(op["id"]))
     _unlocked(obj, op)
     if "dimensions_m" in op:
-        dims = _dims(op["dimensions_m"])
+        dims = parse_dims(op["dimensions_m"])
     else:
         dims = list(obj["dimensions_m"])
         for i, key in enumerate(("width_m", "height_m", "depth_m")):
@@ -502,6 +502,8 @@ def op_move_object(scene: dict, op: dict) -> OpResult:
     _require(op, "id")
     obj = m.find_object(scene, str(op["id"]))
     _unlocked(obj, op)
+    if op.get("place") is not None and not isinstance(op["place"], dict):
+        raise SceneError("invalid_value", 'place must be an object such as {"against_wall": "w1"}', field="place")
     place = dict(op.get("place") or {})
     for k in ("position_m", "yaw_rad", "yaw_deg", "facing", "by", "against_wall", "next_to", "in_corner", "centered_in_room", "on", "align", "offset_m", "gap_m", "side"):
         if k in op and k not in place:

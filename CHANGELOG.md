@@ -1,14 +1,14 @@
 # Changelog
 
-## 0.1.0 (in progress)
+## 0.1.0
 
-Built 2026-11-07, hackathon week.
+Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
 
 - Engine (`rs_core`): scene model, 17 operations with relational placement,
   hard validation and soft issues, fit checks, SQLite store with full-snapshot
   revisions, undo/redo, idempotent commands, cross-process write transaction,
   product dimension parsing, draft→scene layout builder, GLB export.
-- Agent half: nine `roomsmith_*` tools, `/room`, `room-design` skill,
+- Agent half: nine `roomsmith_*` tools (ten since `roomsmith_read_product`), `/room`, `room-design` skill,
   `pre_llm_call` awareness hook; photo reading through `ctx.llm` with a fallback
   ladder.
 - Dashboard backend: FastAPI routes incl. long-poll `wait` and base64 export.
@@ -39,7 +39,7 @@ Built 2026-11-07, hackathon week.
 - Editor: no right-button binding (Hermes Desktop owns right-click for its own
   menu); pan is ⇧-drag or middle-drag, shown in the hint. 60-object room measured
   at 60 fps in Desktop during orbit and drag.
-- From the first live photo read on the Mini (gpt-6-astra, S2 passed): the draft
+- From the first live photo read on Hermes 0.23 (through `ctx.llm`): the draft
   schema gains `mount` and `elevation_m`; a new `lamp_ceiling` category (aliases
   pendant, chandelier, ceiling light…) and label-based detection when the model
   says 'other'; wall-mounted things get a height; fit checks are height-aware
@@ -83,7 +83,7 @@ Built 2026-11-07, hackathon week.
   `scripts/score-draft.py`. Fixed: `roomsmith_inspect detail=full` now includes
   the summary fields (calibration was null). Photo instructions: depth from
   side-wall furniture, no bias either way.
-- Calibration rethought after the first ground truth (Sebb's room is 2.85 × 3.0 m;
+- Calibration rethought after the first ground truth (a room that measures 2.85 × 3.0 m;
   the photo read said 2.65 × 4.4 — width 7 % off, depth 47 % over, the wide-angle
   stretch): new `calibrate {kind: 'room_size', width_m, depth_m}` fits each axis
   separately, keeps furniture sizes, keeps things against their walls and nudges
@@ -117,18 +117,36 @@ Built 2026-11-07, hackathon week.
   variant the user asked about wins ("Queen: 68” W x 93” D" for `bed_queen`);
   a page that prints only the footprint (desk tops: "48 inches x 27 inches") gets
   the category's usual height, with a note; a Shopify JSON without sizes falls
-  through to the page. Read correctly live from the MacBook: Castlery (Hamilton
+  through to the page. Read correctly live: Castlery (Hamilton
   sofa, Casa dining table), Sixpenny (Neva sofa, Neva chair), Albany Park (Kova
   sofas), Thuma (Classic Bed, queen), Branch (Tria desk, Ergonomic chair).
 - 2026-11-10 (later): editor toolbar **Labels on/off** (also the `L` key) hides every
   name tag at once; the selected or hovered object keeps its tag so you never lose
-  what you are pointing at. Asked for by Sebb during the Desktop dry run — the old
-  "Aa" button did this but nobody found it.
+  what you are pointing at. Replaces the old
+  "Aa" button, which nobody found.
 - 2026-11-10 (evening): the editor's **GLB** button exports what the editor shows —
   furniture shapes, plank floor, skirting, openings, product tags, walls made solid
   — via three's GLTFExporter in the browser, instead of the engine's box-per-object
-  file (Sebb opened one in Quick Look: a ceiling fan as a floating black box). The
+  file (in Quick Look a ceiling fan was a floating black box). The
   engine export (`roomsmith_export` tool, dashboard URL) is unchanged and stays
   the box version; the editor falls back to it if the browser export fails.
   Verified by reloading the file with GLTFLoader: 97 nodes, 275 KB for the
   15-object showroom, ~4 s to produce.
+- 2026-11-10 (hardening before the catalog pin):
+  - **Outbound requests are public-only.** `product_fetch.http_get` resolves the
+    host and refuses unless every address is public (loopback, private, link-local,
+    shared 100.64/10, IPv4-mapped and numeric forms such as `2130706433` included),
+    re-checks every redirect hop, and caps the body before and after gzip. The
+    product thumbnail goes through the same function.
+  - **Exports stay in the plugin's data folder.** `roomsmith_export` no longer takes
+    `out_dir`; it writes to `<hermes home>/plugin-data/roomsmith/exports/` and returns
+    the path. The editor's download is unchanged.
+  - **Tool arguments from weaker models.** Numbers as strings, `operations` or
+    `place` as a JSON string, and nonsense values come back as typed errors; the
+    `internal` error no longer carries a traceback. `command_id` is no longer a tool
+    argument (a reused id silently dropped the edit). `inspect detail: full` leaves
+    out embedded product thumbnails (was ~100 KB per product).
+  - **Backend.** Editor writes are always recorded as `user`; bad `steps` no longer 500.
+  - **Structure.** Image handling moved to `rs_core/media.py`; one export builder;
+    the backend calls the service only (`save_photo_bytes`, `active_project_id`).
+    New `docs/ARCHITECTURE.md`. 139 tests.

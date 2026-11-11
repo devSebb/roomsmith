@@ -145,7 +145,6 @@ APPLY = {
             "project_id": {"type": "string"},
             "expected_revision": {"type": "integer", "description": "The revision you last saw"},
             "operations": {"type": "array", "items": {"type": "object"}, "minItems": 1},
-            "command_id": {"type": "string", "description": "Optional unique id so a retried call is applied once"},
         },
         "required": ["operations"],
     },
@@ -171,6 +170,7 @@ APPLY["parameters"]["properties"]["operations"]["items"] = {
         "a": {"type": "string"},
         "b": {"type": "string"},
         "surface": {"type": "string"},
+        "wall": {"type": "string", "description": "Wall id or label (back, right, front, left)"},
         "wall_id": {"type": "string"},
         "kind": {"type": "string"},
         "offset_m": {"type": "number"},
@@ -182,6 +182,9 @@ APPLY["parameters"]["properties"]["operations"]["items"] = {
         "z": {"type": "number"},
         "by": {"type": "array", "items": {"type": "number"}},
         "reference": {"type": "object"},
+        "position_m": {"type": "array", "items": {"type": "number"}, "description": "[x, y, z] exact position; prefer place"},
+        "mount": {"type": "string", "enum": ["floor", "wall", "surface", "ceiling"]},
+        "allow_overlap": {"type": "boolean", "description": "Keep the described spot even if it overlaps"},
         "force": {"type": "boolean"},
     },
     "required": ["op"],
@@ -280,7 +283,6 @@ EXPORT = {
         "properties": {
             "project_id": {"type": "string"},
             "format": {"type": "string", "enum": ["json", "glb", "summary"], "default": "glb"},
-            "out_dir": {"type": "string", "description": "Folder to write into (default: the plugin's exports folder)"},
         },
     },
 }

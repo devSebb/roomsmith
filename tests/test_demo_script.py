@@ -137,7 +137,7 @@ def test_demo_script_end_to_end(demo):
     issues = call("roomsmith_check", question="issues")["issues"]
     assert not [i for i in issues if i["code"] == "blocks_door" and objs["Floor plant"] in i["ids"]]
     for fmt in ("glb", "json", "text"):
-        r = call("roomsmith_export", format=fmt, out_dir=str(demo["tmp"] / "export"))
+        r = call("roomsmith_export", format=fmt)
         assert r["ok"] and Path(r["path"]).stat().st_size > 50, r
 
     # the close: the room list and /room still agree

@@ -149,7 +149,7 @@ def test_tool_round_trip_through_handlers(tmp_path, monkeypatch):
     assert r["ok"] and len(r["objects"]) == 2
     r = call("roomsmith_history", action="list")
     assert r["ok"] and r["revisions"][0]["actor"] == "agent"
-    r = call("roomsmith_export", format="glb", out_dir=str(tmp_path / "exp"))
+    r = call("roomsmith_export", format="glb")
     assert r["ok"] and Path(r["path"]).stat().st_size > 100
     r = call("roomsmith_projects")
     assert r["ok"] and r["projects"][0]["name"] == "Study"

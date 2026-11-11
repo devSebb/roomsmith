@@ -15,9 +15,10 @@ from pathlib import Path
 from typing import Any
 
 from rs_core import layout
-from rs_core.service import RoomService, sniff_image
+from rs_core.media import MAX_PHOTO_BYTES as MAX_BYTES
+from rs_core.media import sniff_image
+from rs_core.service import RoomService
 
-MAX_BYTES = 15 * 1024 * 1024
 LONG_SIDE = 1568
 MAX_IMAGES = 4
 

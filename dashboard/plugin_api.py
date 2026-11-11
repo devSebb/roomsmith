@@ -8,7 +8,6 @@ tools may run in another process; SQLite is the shared state.
 
 from __future__ import annotations
 
-import hashlib
 import sys
 import time
 from pathlib import Path
@@ -22,7 +21,8 @@ if str(_PLUGIN_ROOT) not in sys.path:
 
 from rs_agent import paths  # noqa: E402
 from rs_core import __version__  # noqa: E402
-from rs_core.service import RoomService, new_command_id, sniff_image  # noqa: E402
+from rs_core.media import IMAGE_MIME  # noqa: E402
+from rs_core.service import RoomService, new_command_id  # noqa: E402
 
 router = APIRouter()
 
@@ -54,6 +54,13 @@ def _reply(result: dict, ok_status: int = 200) -> JSONResponse:
         "unsupported_format": 415,
     }.get(code, 400)
     return JSONResponse(result, status_code=status)
+
+
+def _steps(body: dict) -> int:
+    try:
+        return max(1, int(body.get("steps") or 1))
+    except (TypeError, ValueError):
+        return 1
 
 
 async def _json_body(request: Request) -> dict:
@@ -137,7 +144,7 @@ async def commands(project_id: str, request: Request):
         "project_id": project_id,
         "expected_revision": body.get("expected_revision"),
         "command_id": body.get("command_id") or new_command_id(),
-        "actor": body.get("actor") or "user",
+        "actor": "user",  # this API is the editor; only the agent's tools write as "agent"
         "operations": body.get("operations"),
     }
     return _reply(_svc().apply(command))
@@ -146,13 +153,13 @@ async def commands(project_id: str, request: Request):
 @router.post("/projects/{project_id}/undo")
 async def undo(project_id: str, request: Request):
     body = await _json_body(request)
-    return _reply(_svc().undo(project_id, int(body.get("steps") or 1), actor="user"))
+    return _reply(_svc().undo(project_id, _steps(body), actor="user"))
 
 
 @router.post("/projects/{project_id}/redo")
 async def redo(project_id: str, request: Request):
     body = await _json_body(request)
-    return _reply(_svc().redo(project_id, int(body.get("steps") or 1), actor="user"))
+    return _reply(_svc().redo(project_id, _steps(body), actor="user"))
 
 
 @router.post("/projects/{project_id}/check")
@@ -200,22 +207,7 @@ async def add_product(project_id: str, request: Request):
 async def upload_photo(request: Request):
     """Raw image bytes in the body (image/jpeg, image/png, image/webp)."""
     data = await request.body()
-    if not data:
-        return JSONResponse({"ok": False, "error": {"code": "missing_field", "message": "Empty body"}}, status_code=400)
-    if len(data) > 15 * 1024 * 1024:
-        return JSONResponse({"ok": False, "error": {"code": "too_large", "message": "Photos must be under 15 MB"}}, status_code=413)
-    kind = sniff_image(data)
-    if kind is None:
-        return JSONResponse({"ok": False, "error": {"code": "unsupported_format", "message": "Only JPEG, PNG and WebP"}}, status_code=415)
-    sha = hashlib.sha256(data).hexdigest()
-    photo_id = "p" + sha[:12]
-    svc = _svc()
-    dest = svc.data_dir / "photos" / f"{photo_id}.{kind}"
-    if not dest.exists():
-        dest.write_bytes(data)
-    project_id = request.query_params.get("project_id") or None
-    row = svc.store.add_photo(photo_id, str(dest), sha, None, None, project_id)
-    return JSONResponse({"ok": True, "photo_id": photo_id, "file": row["file"], "format": kind, "bytes": len(data)}, status_code=201)
+    return _reply(_svc().save_photo_bytes(data, project_id=request.query_params.get("project_id") or None), 201)
 
 
 @router.get("/photos/{photo_id}")
@@ -224,7 +216,7 @@ async def get_photo(photo_id: str):
     if p is None or not p.is_file():
         return JSONResponse({"ok": False, "error": {"code": "not_found", "message": "No such photo"}}, status_code=404)
     data = p.read_bytes()
-    mime = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(p.suffix.lstrip("."), "application/octet-stream")
+    mime = IMAGE_MIME.get(p.suffix.lstrip("."), "application/octet-stream")
     return Response(content=data, media_type=mime, headers={"Cache-Control": "private, max-age=3600"})
 
 
@@ -264,7 +256,7 @@ async def wait_for_change(project_id: str, after: int = 0, timeout: float = 25.0
         h = svc.head(project_id)
         if not h.get("ok"):
             return _reply(h)
-        current_active = svc.store.active_project_id()
+        current_active = svc.active_project_id()
         active_changed = active is not None and current_active is not None and current_active != active
         if int(h["revision"]) > int(after) or active_changed or time.monotonic() >= deadline:
             h["changed"] = int(h["revision"]) > int(after)
@@ -272,5 +264,3 @@ async def wait_for_change(project_id: str, after: int = 0, timeout: float = 25.0
             h["active_changed"] = active_changed
             return JSONResponse(h)
         await asyncio.sleep(0.5)
-
-

@@ -61,7 +61,7 @@ def main() -> int:
     out = Path(a.out); out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(out_text)
     print(f"wrote {out} pinned to {sha}")
-    print("next: copy it to <hermes-agent fork>/plugin-catalog/roomsmith.yaml and open the PR from devSebb (see docs/ROOMSMITH_PLAN.md §16)")
+    print("next: copy it to <hermes-agent fork>/plugin-catalog/roomsmith.yaml and open the PR from devSebb")
     return 0
 
 
