@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import time
 import uuid
 from pathlib import Path
@@ -18,7 +19,7 @@ from rs_core import product_fetch
 from rs_core import geometry as g
 from rs_core import export_glb, fitcheck, layout, media, money, ops, summarize, validate
 from rs_core import model as m
-from rs_core.catalog import normalize_category
+from rs_core.catalog import normalize_category, spec_for
 from rs_core.model import SceneError
 from rs_core.store import NotFound, RevisionConflict, Store
 
@@ -397,12 +398,20 @@ class RoomService:
 
     # ------------------------------------------------------------ products
 
-    def add_product(self, project_id: str | None, title: str, dimensions_text: str | None = None, dimensions_m: list[float] | None = None, url: str | None = None, image_url: str | None = None, price: str | None = None, category: str | None = None, color: str | None = None, place: dict | None = None, expected_revision: int | None = None, actor: str = "agent", command_id: str | None = None) -> dict:
+    def add_product(self, project_id: str | None, title: str, dimensions_text: str | None = None, dimensions_m: list[float] | None = None, url: str | None = None, image_url: str | None = None, price: str | None = None, category: str | None = None, color: str | None = None, place: dict | None = None, expected_revision: int | None = None, actor: str = "agent", command_id: str | None = None, dims_source: str | None = None) -> dict:
         pid = self._resolve_project(project_id)
         if not pid:
             return self._no_project(project_id)
         title = (title or "").strip()
         fetched: dict | None = None
+        # a bare size from the agent, with no printed text behind it, is the agent's estimate unless it says who stated it
+        size_is_estimate = dimensions_m is not None and not dimensions_text and actor == "agent" and str(dims_source or "").lower() not in ("stated", "measured")
+        if url and dimensions_m is not None and not (title and price and image_url):
+            page = self.read_product(url, category=category or title or None)  # the size was supplied; the name, price and photo still come from the page
+            if page.get("ok"):
+                title = title or page.get("title") or ""
+                price = price or page.get("price")
+                image_url = image_url or page.get("image_url")
         if url and dimensions_m is None and not dimensions_text:
             # the agent gave us only a link: read the page ourselves
             fetched = self.read_product(url, category=category or title or None)
@@ -445,7 +454,7 @@ class RoomService:
             "name": title[:60],
             "category": category or title,
             "dimensions_m": dimensions_m,
-            "provenance": {"class": "dimensioned_placeholder", "dims_source": "stated", "confidence": 0.9},
+            "provenance": {"class": "dimensioned_placeholder", "dims_source": "estimated" if size_is_estimate else "stated", "confidence": 0.6 if size_is_estimate else 0.9},
             "product": product,
         }
         if color:
@@ -466,6 +475,8 @@ class RoomService:
             pass
         if parsed and parsed.get("assumed_order"):
             res["note"] = parsed["order_note"]
+        if size_is_estimate:
+            res["size_note"] = "The size was not read from the product page: it is recorded as an estimate. Tell the user, and ask them to check the size on the page."
         status = money.budget_status(scene)
         if status:
             res["budget"] = status
@@ -596,6 +607,14 @@ class RoomService:
             except SceneError:
                 dims = None
         row["source"] = source
+        estimated_from = None
+        if dims is None and url and row.get("title") and (cat or "").startswith("bed"):
+            # bed pages often give only the mattress size ("Queen"); the standard size for that word is a usable estimate
+            named = next((c for c, words in product_fetch.BED_SIZE_WORDS.items() if re.search(rf"\b(?:{words})\b", row["title"], re.I)), None)
+            if named:
+                dims = list(spec_for(named).default)
+                estimated_from = named.replace("bed_", "")
+                row["size_estimated"] = True
         if dims is None:
             return {**row, "status": "no_dimensions", "why": "No readable size. Ask the user for the size printed on the page."}
         row["dimensions_m"] = [round(float(v), 3) for v in dims]
@@ -629,6 +648,8 @@ class RoomService:
             row["price_amount"], row["price_currency"] = price[0], price[1]
         size = f"{dims[0]:.2f} × {dims[2]:.2f} × {dims[1]:.2f} m (w × d × h)"
         tag = "" if row["verified"] else " Size and price are as you gave them, not read from a page."
+        if estimated_from:
+            tag = f" The page prints no frame size: this is the standard {estimated_from} bed size, an estimate. Add it with dimensions_m only if the user accepts that."
         if not fits:
             return {**row, "status": "does_not_fit", "why": f"{size}: does not fit. {fit_text}".strip() + tag}
         if door.get("passes") is False:

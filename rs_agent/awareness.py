@@ -51,7 +51,7 @@ def furnishing_brief(svc: Any) -> str:
             first,
             "2. Record it: roomsmith_apply {op: set_budget, limit, currency}; if they named a look, {op: set_style, style}.",
             "3. For each piece: web search for 3 to 6 product-page URLs (never invent a URL) -> roomsmith_shortlist {category, candidates, place} -> roomsmith_add_product {url, category, place} for the chosen row. "
-            "Pages that print the size read best; these shops do: songmics.com (VASAGLE), nathanjames.com, brightech.com, simpli-home.com, walkeredison.com, branchfurniture.com, castlery.com. If a shop's pages come back no_dimensions or blocked, switch shop rather than retrying it.",
+            "Pages that print the size read best; these shops do: songmics.com (VASAGLE), nathanjames.com, brightech.com, simpli-home.com, walkeredison.com, branchfurniture.com, castlery.com; ikea.com for pieces whose name carries the size (nightstands, desks, shelves). If a shop's pages come back no_dimensions or blocked, switch to a shop you have not tried; if several shops in a row are blocked, this machine's network is being refused: say so and ask the user for links or sizes.",
             "4. If a reply carries budget_note (over budget, into the buffer, no price), tell the user and ask before continuing.",
             "5. Finish with a table: piece, size, price, link; the total; what is left. Say prices are as read today.",
         ]

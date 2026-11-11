@@ -205,3 +205,10 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
   - The shortlist's reply and the furnishing brief say what to do when rows come
     back `no_dimensions` or unverified, so the agent switches shop and does not stall.
     208 tests.
+- 2026-11-10 (after the second live furnishing turn): bed pages that give only a
+  mattress size ("Queen") no longer dead-end: the shortlist offers the standard
+  size for that word as a flagged estimate, never as the recommendation. A bare
+  size from the agent is recorded as an estimate and the reply says so; with a
+  link, the name, price and photo still come from the page. The furnishing brief
+  says to stop and tell the user when several shops in a row refuse the machine.
+  209 tests.

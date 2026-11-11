@@ -212,6 +212,7 @@ def add_product(args: dict, kwargs: dict) -> dict:
         title=str(args.get("title") or ""),
         dimensions_text=args.get("dimensions_text"),
         dimensions_m=args.get("dimensions_m"),
+        dims_source=args.get("dims_source"),
         url=args.get("url"),
         image_url=args.get("image_url"),
         price=args.get("price"),

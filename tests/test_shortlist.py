@@ -119,6 +119,23 @@ def test_unread_products_are_listed_but_never_recommended(shop):
     assert statuses == ["blocked", "ok", "ok"]
 
 
+def test_a_bed_page_with_only_a_mattress_size_gets_the_standard_size_as_a_flagged_estimate(shop, monkeypatch):
+    """Found live: bed pages (IKEA, Target) print "Queen" and no frame size, so every bed came back no_dimensions."""
+    svc, room, _ = shop
+    PAGES["tarva-queen"] = page("TARVA Bed frame - pine Queen", "149.00", None)
+    PAGES["plain-bed"] = page("Wooden bed frame", "120.00", None)
+    out = svc.shortlist(room, "bed_queen", [U("tarva-queen"), U("plain-bed")])
+    rows = by_title(out)
+    q = rows["TARVA Bed frame - pine Queen"]
+    assert q["status"] == "ok" and q["verified"] is False and q["size_estimated"] is True and q["dimensions_m"][0] == 1.6
+    assert "standard queen bed size, an estimate" in q["why"] and out["recommended"] is None
+    assert rows["Wooden bed frame"]["status"] == "no_dimensions"
+    r = svc.add_product(room, title="", url=U("tarva-queen")["url"], dimensions_m=q["dimensions_m"], category="bed_queen", place=q["place"], actor="agent")
+    assert r["ok"] and "estimate" in r["size_note"]
+    obj = svc.scene(room)["scene"]["objects"][-1]
+    assert obj["provenance"]["dims_source"] == "estimated" and obj["product"]["title"] == "TARVA Bed frame - pine Queen" and obj["product"]["price_amount"] == 149.0
+
+
 def test_limits_duplicates_and_bad_input(shop):
     svc, room, calls = shop
     too_many = svc.shortlist(room, "desk", [U("small-desk")] * (SHORTLIST_MAX + 1))

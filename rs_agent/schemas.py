@@ -259,6 +259,7 @@ ADD_PRODUCT = {
             "title": {"type": "string"},
             "dimensions_text": {"type": "string", "description": "Dimensions as written on the page"},
             "dimensions_m": _DIMS,
+            "dims_source": {"type": "string", "enum": ["stated", "estimated"], "description": "For dimensions_m: 'stated' only when the user gave the size; otherwise it is recorded as your estimate"},
             "url": {"type": "string"},
             "image_url": {"type": "string"},
             "price": {"type": "string"},

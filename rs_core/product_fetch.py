@@ -45,6 +45,7 @@ _PRIORITY = re.compile(r"overall|dimension|measure|size", re.I)
 # the box it ships in, not the thing: "Package: 29 x 25 x 15 | 44 lbs", "(1 of 2) - 83” x 13” x 5”"
 _DEMOTE = re.compile(r"packag|box|carton|shipping|ships|parcel|\(\d+ of \d+\)|\blbs?\b|\bkg\b|weight|\breviews?\b|\bI (?:bought|ordered|have|love|returned|purchased)\b|\bstars?\b", re.I)
 _SIZE_WORDS = {"bed_single": "twin|single", "bed_double": "full|double", "bed_queen": "queen", "bed_king": "king"}
+BED_SIZE_WORDS = _SIZE_WORDS
 MAX_SCRIPT_BYTES = 3 * 1024 * 1024
 
 

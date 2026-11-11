@@ -268,8 +268,13 @@ def test_a_size_the_agent_chose_is_an_estimate_and_a_size_the_user_gave_is_state
     assert r["ok"], r
     objs = {o["name"]: o["provenance"]["dims_source"] for o in tools.get_service().scene(None)["scene"]["objects"]}
     assert objs == {"Wardrobe": "estimated", "Sofa": "stated", "Chair": "estimated"}
-    p = tools.get_service().add_product(None, title="Desk", dimensions_m=[1.0, 0.75, 0.5], actor="agent")
-    assert p["ok"] and tools.get_service().scene(None)["scene"]["objects"][-1]["provenance"]["dims_source"] == "stated"
+    svc = tools.get_service()
+    last = lambda: svc.scene(None)["scene"]["objects"][-1]["provenance"]["dims_source"]  # noqa: E731
+    p = svc.add_product(None, title="Desk", dimensions_m=[1.0, 0.75, 0.5], actor="agent")
+    assert p["ok"] and last() == "estimated" and "not read from the product page" in p["size_note"]
+    assert svc.add_product(None, title="Shelf", dimensions_text="80 x 30 x 180 cm", actor="agent")["ok"] and last() == "stated"
+    assert svc.add_product(None, title="Lamp", dimensions_m=[0.3, 1.6, 0.3], dims_source="stated", actor="agent")["ok"] and last() == "stated"
+    assert svc.add_product(None, title="Stool", dimensions_m=[0.4, 0.45, 0.4], actor="user")["ok"] and last() == "stated"  # typed in the editor
     tools.reset_service()
 
 
