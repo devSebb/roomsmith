@@ -14,6 +14,7 @@ from rs_core.service import RoomService, new_command_id
 _service: RoomService | None = None
 _service_lock = threading.Lock()
 _sessions_using_rooms: set[str] = set()
+_told_selection: dict[str, tuple] = {}  # session id -> the selection it was last told about
 
 
 def get_service() -> RoomService:
@@ -34,6 +35,7 @@ def reset_service() -> None:
             except Exception:
                 pass
         _service = None
+    _told_selection.clear()
 
 
 def note_session(kwargs: dict) -> None:
@@ -44,6 +46,17 @@ def note_session(kwargs: dict) -> None:
 
 def session_uses_rooms(session_id: str | None) -> bool:
     return bool(session_id) and str(session_id) in _sessions_using_rooms
+
+
+def selection_is_news(session_id: str, selected: dict | None) -> bool:
+    """True once per session for each new selection (so the hint is not repeated every turn)."""
+    key = (selected["project_id"], selected["kind"], selected["id"]) if selected else None
+    if _told_selection.get(session_id) == key:
+        return False
+    if len(_told_selection) > 200:
+        _told_selection.clear()
+    _told_selection[session_id] = key
+    return key is not None
 
 
 def _dump(obj: Any) -> str:
@@ -106,7 +119,7 @@ def _trim_inspect(out: dict) -> dict:
     """Keep inspect replies compact for the model: text first, numbers second."""
     if not out.get("ok"):
         return out
-    keep = {k: out[k] for k in ("ok", "project_id", "name", "revision", "can_undo", "can_redo", "text", "issues", "created", "notes", "steps", "summary", "budget") if k in out}
+    keep = {k: out[k] for k in ("ok", "project_id", "name", "revision", "can_undo", "can_redo", "text", "issues", "created", "notes", "steps", "summary", "budget", "selected") if k in out}
     keep["room"] = out.get("room")
     keep["objects"] = out.get("objects")
     keep["calibration"] = (out.get("calibration") or {}).get("status")

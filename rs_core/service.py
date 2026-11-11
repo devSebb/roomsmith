@@ -24,6 +24,7 @@ from rs_core.store import NotFound, RevisionConflict, Store
 
 ACTORS = ("user", "agent", "system")
 SHORTLIST_MAX = 6
+SELECTION_TTL_S = 15 * 60.0
 SHORTLIST_DEADLINE_S = 45.0
 
 
@@ -204,6 +205,9 @@ class RoomService:
             out["revision"] = rev
         undo, redo = self.store.history_stacks(pid)
         out["can_undo"], out["can_redo"] = bool(undo), bool(redo)
+        selected = self.selection(pid)
+        if selected:
+            out["selected"] = {k: selected[k] for k in ("kind", "id", "name")}
         if mark_seen:
             self.store.mark_agent_seen(pid, rev)
         return out
@@ -762,6 +766,47 @@ class RoomService:
             return {"ok": True, "project_id": pid, "revision": h["revision"], "changes": []}
         changes = [c for c in self.store.revisions_between(pid, seen) if c["actor"] != "agent"]
         return {"ok": True, "project_id": pid, "name": h["name"], "revision": h["revision"], "seen_revision": seen, "changes": changes}
+
+    def set_selection(self, project_id: str | None, kind: str | None, ident: str | None) -> dict:
+        """What the user has selected in the editor. A hint for the agent, not an edit:
+        it is not a revision and it expires."""
+        pid = self._resolve_project(project_id)
+        if not pid:
+            return self._no_project(project_id)
+        value = None
+        if ident and kind in ("object", "opening", "wall"):
+            scene, _ = self.store.get_scene(pid)
+            if self._selected_name(scene, kind, str(ident)) is not None:
+                value = {"kind": kind, "id": str(ident), "at": time.time()}
+        self.store.set_meta(f"selection:{pid}", json.dumps(value))
+        return {"ok": True, "selected": value}
+
+    def selection(self, project_id: str | None = None, now: float | None = None) -> dict | None:
+        """{kind, id, name} if the user selected something recently and it still exists."""
+        pid = self._resolve_project(project_id)
+        if not pid:
+            return None
+        try:
+            value = json.loads(self.store.get_meta(f"selection:{pid}") or "null")
+        except ValueError:
+            return None
+        if not isinstance(value, dict) or (now or time.time()) - float(value.get("at") or 0) > SELECTION_TTL_S:
+            return None
+        scene, _ = self.store.get_scene(pid)
+        name = self._selected_name(scene, value.get("kind"), str(value.get("id")))
+        if name is None:
+            return None
+        return {"project_id": pid, "kind": value["kind"], "id": value["id"], "name": name}
+
+    @staticmethod
+    def _selected_name(scene: dict, kind: str | None, ident: str) -> str | None:
+        if kind == "object":
+            return next((o["name"] for o in scene["objects"] if o["id"] == ident), None)
+        if kind == "opening":
+            return next((f"{o['kind']} on {o['wall_id']}" for o in scene["room"]["openings"] if o["id"] == ident), None)
+        if kind == "wall":
+            return next((f"{w.get('label') or 'wall'} wall" for w in scene["room"]["walls"] if w["id"] == ident), None)
+        return None
 
     def mark_seen(self, project_id: str | None = None) -> None:
         pid = self._resolve_project(project_id)

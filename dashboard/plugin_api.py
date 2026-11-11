@@ -178,6 +178,13 @@ async def check(project_id: str, request: Request):
     )
 
 
+@router.post("/projects/{project_id}/selection")
+async def selection(project_id: str, request: Request):
+    """The editor reports what the user selected, so the agent knows what "this" is."""
+    body = await _json_body(request)
+    return _reply(_svc().set_selection(project_id, body.get("kind"), body.get("id")))
+
+
 @router.post("/projects/{project_id}/shortlist")
 async def shortlist(project_id: str, request: Request):
     """Compare products for one spot. The page reads are blocking, so they run off the event loop."""

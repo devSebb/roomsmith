@@ -183,6 +183,43 @@ def test_awareness_hook_only_after_tool_use(tmp_path, monkeypatch):
     assert hook(session_id="other") is None
 
 
+def test_the_agent_is_told_what_the_user_selected_once(tmp_path, monkeypatch):
+    monkeypatch.setenv("ROOMSMITH_DATA_DIR", str(tmp_path))
+    mod = _load_plugin()
+    from rs_agent import tools
+
+    tools.reset_service()
+    ctx = RecordingContext()
+    mod.register(ctx)
+    hook = ctx.hooks["pre_llm_call"][0]
+    call = lambda tool, **args: json.loads(ctx.tools[tool]["handler"](args, session_id="s1"))  # noqa: E731
+    call("roomsmith_new_room", name="Study", width_m=4, depth_m=4)
+    call("roomsmith_apply", operations=[{"op": "add_object", "name": "Armchair", "category": "armchair"}, {"op": "add_object", "name": "Desk", "category": "desk"}])
+    svc = tools.get_service()
+    assert hook(session_id="s1") is None  # nothing selected yet
+    assert svc.set_selection(None, "object", "ob1")["selected"]["id"] == "ob1"
+    assert hook(session_id="never-used-roomsmith") is None
+    out = hook(session_id="s1")
+    assert out and "'Armchair' (ob1) selected" in out["context"] and out["context"].count("\n") == 0
+    assert hook(session_id="s1") is None  # said once
+    assert call("roomsmith_inspect")["selected"] == {"kind": "object", "id": "ob1", "name": "Armchair"}
+    svc.set_selection(None, "object", "ob2")
+    assert "'Desk' (ob2)" in hook(session_id="s1")["context"]
+    svc.set_selection(None, "object", "ob99")  # unknown id clears
+    assert svc.selection(None) is None and hook(session_id="s1") is None
+    svc.set_selection(None, "object", "ob2")
+    hook(session_id="s1")
+    svc.apply({"actor": "user", "operations": [{"op": "remove_object", "id": "ob2"}]})
+    assert svc.selection(None) is None  # the selected thing is gone
+    svc.set_selection(None, "object", "ob1")
+    import time
+
+    assert svc.selection(None, now=time.time() + 16 * 60) is None  # stale
+    assert svc.set_selection(None, "galaxy", "ob1")["selected"] is None
+    assert svc.store.head(svc.active_project_id())["revision"] == 3  # selecting never makes a revision
+    tools.reset_service()
+
+
 def test_from_photo_without_llm_falls_back(tmp_path, monkeypatch):
     monkeypatch.setenv("ROOMSMITH_DATA_DIR", str(tmp_path))
     mod = _load_plugin()

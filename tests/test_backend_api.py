@@ -101,3 +101,21 @@ def test_wait_returns_at_once_when_the_active_room_changes(client):
     # Without the client's known id there is nothing to compare: plain timeout behaviour.
     r = client.get(f"/api/plugins/roomsmith/projects/{a}/wait?after=1&timeout=0.3").json()
     assert r["active_changed"] is False and r["active_project_id"] == b
+
+
+def test_budget_selection_and_shortlist_routes(client):
+    pid = client.post("/api/plugins/roomsmith/projects", json={"name": "Office", "width_m": 3, "depth_m": 4}).json()["project_id"]
+    base = f"/api/plugins/roomsmith/projects/{pid}"
+    assert client.get(base + "/scene").json()["budget"] is None
+    r = client.post(base + "/commands", json={"operations": [{"op": "set_budget", "limit": 400, "currency": "USD"}, {"op": "add_object", "name": "Desk", "category": "desk"}], "actor": "agent"})
+    assert r.status_code == 200 and r.json()["budget"]["limit"] == 400.0
+    assert client.get(base + "/history").json()["revisions"][0]["actor"] == "user"  # the editor cannot write as the agent
+    r = client.post(base + "/products", json={"title": "Chair", "dimensions_m": [0.5, 0.9, 0.5], "price": "$450"})
+    assert r.status_code == 200 and r.json()["budget"]["over_limit"] is True  # added, and reported
+    scene = client.get(base + "/scene").json()
+    assert scene["budget"]["spent"] == 450.0 and [i for i in scene["issues"] if i["code"] == "over_budget"]
+    assert client.post(base + "/selection", json={"kind": "object", "id": "ob1"}).json()["selected"]["id"] == "ob1"
+    assert client.post(base + "/selection", json={"id": None}).json()["selected"] is None
+    r = client.post(base + "/shortlist", json={"category": "lamp_floor", "candidates": [{"title": "Lamp", "dimensions_m": [0.3, 1.6, 0.3], "price": "$40"}]})
+    assert r.status_code == 200 and r.json()["candidates"][0]["status"] == "over_budget"
+    assert client.post(base + "/shortlist", json={"category": "desk"}).status_code == 400
