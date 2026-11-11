@@ -496,7 +496,7 @@ function AddPanel({ store, scene }: { store: Store; scene: Scene }) {
   const add = () => {
     const op: Record<string, unknown> = { op: 'add_object', name: name.trim() || cap(nice(cat)), category: cat }
     const w = +dims.w, h = +dims.h, d = +dims.d
-    if (w > 0 && h > 0 && d > 0) op.dimensions_m = [w, h, d]
+    if (w > 0 && h > 0 && d > 0) { op.dimensions_m = [w, h, d]; op.dims_source = 'stated' }
     store.apply([op as any]).then(r => { const id = r?.results?.[0]?.created_id; if (id) store.select(id) })
   }
   return (

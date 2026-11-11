@@ -220,6 +220,59 @@ def test_the_agent_is_told_what_the_user_selected_once(tmp_path, monkeypatch):
     tools.reset_service()
 
 
+def test_a_furnishing_request_gets_the_steps_in_the_turn_where_the_model_will_see_them(tmp_path, monkeypatch):
+    """Hermes loads tool descriptions lazily and skills on request, so "furnish it" must
+    carry the procedure itself (found in a live run: the model added generic furniture
+    without asking for a budget)."""
+    monkeypatch.setenv("ROOMSMITH_DATA_DIR", str(tmp_path))
+    mod = _load_plugin()
+    from rs_agent import tools
+
+    tools.reset_service()
+    ctx = RecordingContext()
+    mod.register(ctx)
+    hook = ctx.hooks["pre_llm_call"][0]
+    call = lambda tool, **args: json.loads(ctx.tools[tool]["handler"](args, session_id="s1"))  # noqa: E731
+    # a session that never used Roomsmith: silent on money talk, speaks only for a plain furnishing request
+    assert hook(session_id="cold", user_message="what is my budget for groceries, under $200?") is None
+    cold = hook(session_id="cold", user_message="Can you furnish my bedroom?")
+    assert cold and "ASK the user for their budget" in cold["context"]
+    r = call("roomsmith_new_room", name="Bedroom", width_m=3.4, depth_m=4.2)
+    assert "set_budget" in r["to_furnish"] and "ask for their budget" in r["to_furnish"]
+    assert hook(session_id="s1", user_message="make the room 10 cm wider") is None
+    out = hook(session_id="s1", user_message="furnish it")["context"]
+    assert "REAL products" in out and "ASK the user for their budget now" in out and "buffer" in out and "roomsmith_shortlist" in out and "never invent a URL" in out
+    assert out.count("\n") <= 6
+    call("roomsmith_apply", operations=[{"op": "set_budget", "limit": 1000, "currency": "USD"}])
+    out = hook(session_id="s1", user_message=[{"type": "text", "text": "ok, 1,000 dollars, warm minimalist"}, {"type": "image", "data": "..."}])["context"]
+    assert "Budget USD 1,000" in out and "ASK the user" not in out
+    assert "to_furnish" not in call("roomsmith_inspect")
+    # the labels the model sees before it describes any tool point furnishing at the right tool
+    labels = {n: ctx.tools[n]["description"] for n in ctx.tools}
+    assert "furnish" in labels["roomsmith_apply"].lower() and "shortlist" in labels["roomsmith_apply"]
+    assert labels["roomsmith_shortlist"].lower().startswith("furnishing or shopping")
+    tools.reset_service()
+
+
+def test_a_size_the_agent_chose_is_an_estimate_and_a_size_the_user_gave_is_stated(tmp_path, monkeypatch):
+    monkeypatch.setenv("ROOMSMITH_DATA_DIR", str(tmp_path))
+    from rs_agent import tools
+
+    tools.reset_service()
+    json.loads(tools.new_room({"name": "Room", "width_m": 4, "depth_m": 4}))
+    r = json.loads(tools.apply({"operations": [
+        {"op": "add_object", "name": "Wardrobe", "category": "wardrobe", "dimensions_m": [1.5, 2.0, 0.6]},
+        {"op": "add_object", "name": "Sofa", "category": "sofa", "dimensions_m": [2.1, 0.8, 0.9], "dims_source": "stated"},
+        {"op": "add_object", "name": "Chair", "category": "chair"},
+    ]}))
+    assert r["ok"], r
+    objs = {o["name"]: o["provenance"]["dims_source"] for o in tools.get_service().scene(None)["scene"]["objects"]}
+    assert objs == {"Wardrobe": "estimated", "Sofa": "stated", "Chair": "estimated"}
+    p = tools.get_service().add_product(None, title="Desk", dimensions_m=[1.0, 0.75, 0.5], actor="agent")
+    assert p["ok"] and tools.get_service().scene(None)["scene"]["objects"][-1]["provenance"]["dims_source"] == "stated"
+    tools.reset_service()
+
+
 def test_from_photo_without_llm_falls_back(tmp_path, monkeypatch):
     monkeypatch.setenv("ROOMSMITH_DATA_DIR", str(tmp_path))
     mod = _load_plugin()

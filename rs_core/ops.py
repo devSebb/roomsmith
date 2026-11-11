@@ -320,11 +320,15 @@ def op_add_object(scene: dict, op: dict) -> OpResult:
     category = normalize_category(op.get("category") or name)
     dims = parse_dims(op["dimensions_m"]) if "dimensions_m" in op else None
     provenance = op.get("provenance") if isinstance(op.get("provenance"), dict) else None
-    if dims is None:
+    source = str(op.get("dims_source") or "").lower()
+    if dims is None or (provenance is None and not isinstance(op.get("product"), dict) and source not in ("stated", "measured")):
+        # a typical size, or a size the caller chose: an estimate unless they say who stated it
         provenance = dict(provenance or {})
         provenance.setdefault("class", "generated_approximation")
         provenance.setdefault("dims_source", "estimated")
-        provenance.setdefault("confidence", 0.5)
+        provenance.setdefault("confidence", 0.5 if dims is None else 0.6)
+    elif provenance is None and source in ("stated", "measured"):
+        provenance = {"class": "user_supplied", "dims_source": source, "confidence": 1.0}
     obj = m.make_object(
         scene,
         name,

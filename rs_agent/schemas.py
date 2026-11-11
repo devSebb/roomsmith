@@ -123,9 +123,10 @@ INSPECT = {
 APPLY = {
     "name": "roomsmith_apply",
     "description": (
-        "Edit the room with one atomic batch of operations (all apply or none). Pass expected_revision from your last inspect; "
+        "Edit the room with one atomic batch of operations (all apply or none); to furnish it with real products use roomsmith_shortlist. Pass expected_revision from your last inspect; "
         "on 'revision_conflict' re-inspect and retry. Operations (each an object with 'op'):\n"
-        "- add_object {name, category, dimensions_m?, place?, color?} (omit dimensions for a typical size)\n"
+        "- add_object {name, category, dimensions_m?, dims_source?, place?, color?} adds a GENERIC stand-in (omit dimensions for a typical size; dims_source 'stated' only when the user gave the size, otherwise it is recorded as an estimate). "
+        "To FURNISH or shop for the room, do not use this: use real products (see roomsmith_shortlist and roomsmith_add_product)\n"
         "- move_object {id, place} | rotate_object {id, yaw_deg | by_deg | facing} | set_dimensions {id, dimensions_m | width_m/height_m/depth_m}\n"
         "- update_object {id, name?, category?, color?, locked?} | duplicate_object {id, place?} | remove_object {id} | swap_objects {a, b}\n"
         "- set_room_rectangle {width_m, depth_m} | set_room_height {height_m} | set_wall_length {id, length_m} | move_vertex {id, x?, z?, by?}\n"
@@ -159,6 +160,7 @@ APPLY["parameters"]["properties"]["operations"]["items"] = {
         "name": {"type": "string"},
         "category": {"type": "string"},
         "dimensions_m": _DIMS,
+        "dims_source": {"type": "string", "enum": ["stated", "estimated", "measured"], "description": "Who gave the size: 'stated' = the user or a product page; default 'estimated'"},
         "place": _PLACE,
         "color": {"type": "string"},
         "locked": {"type": "boolean"},
@@ -272,7 +274,10 @@ ADD_PRODUCT = {
 SHORTLIST = {
     "name": "roomsmith_shortlist",
     "description": (
-        "Compare up to 6 real products for one spot. The plugin reads each product page (size, price), tests the size in the room "
+        "Furnishing or shopping for the room: compare up to 6 real products for one spot against the room and the user's budget. "
+        "FIRST, if no budget is set, ask the user for one (and once whether to keep a buffer) and record it with roomsmith_apply set_budget; record a look they name with set_style. "
+        "Then for each piece: find 3 to 6 product-page URLs with your web search, call this, and add the chosen row with roomsmith_add_product {url, category, place}. "
+        "The plugin reads each product page (size, price), tests the size in the room "
         "(at `place`, in place of `replace_object_id`, or the best free spot), checks the door, compares the price with the room's budget, and returns a ranked table "
         "with a recommendation. It adds nothing: add the chosen one with roomsmith_add_product. Candidates are product-page URLs your web search returned or the user gave "
         "(never invent a URL); or {title, dimensions_text, price} the user typed. Rows with verified false were not read from a page: do not present them as checked."

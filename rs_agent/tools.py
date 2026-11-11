@@ -126,9 +126,15 @@ def _trim_inspect(out: dict) -> dict:
     if "scene" in out:
         keep["scene"] = _without_image_data(out["scene"])
     keep["editor_hint"] = EDITOR_HINT
+    if "budget" not in keep:
+        keep["to_furnish"] = FURNISH_HINT
     return keep
 
 
+FURNISH_HINT = (
+    "No budget is set. If the user asks to furnish, decorate or shop for this room: ask for their budget (and once whether to keep a buffer) before adding anything, "
+    "record it with set_budget, then use real products: web search -> roomsmith_shortlist -> roomsmith_add_product. add_object makes generic stand-ins only."
+)
 EDITOR_HINT = "The user can open this room in Hermes Desktop (Roomsmith pane) or the dashboard's Roomsmith tab; edits there show up here."
 
 

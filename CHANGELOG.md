@@ -185,3 +185,11 @@ Built 7–10 November 2026 for the Hermes Agent Plugin Hackathon.
   with it, the editor shows it, inspect and the shortlist return it. The plugin
   does not judge style and says so. 203 tests.
 - 2026-11-10 (late): screenshots, banner and GIF retaken with the new look (GPU, double resolution).
+- 2026-11-10 (after the first live furnishing run): "furnish it" made the model add
+  generic furniture without asking for a budget. Hermes loads tool descriptions
+  lazily and skills on request, so the model never saw the procedure. Now the
+  `pre_llm_call` hook hands it the furnishing steps and the room's budget state
+  in the turn where the user asks; `inspect` says how to furnish when no budget
+  is set; the tool labels point furnishing at `roomsmith_shortlist`. A size the
+  agent chose for a generic piece is recorded as an estimate (`dims_source`),
+  not as stated. 205 tests.
