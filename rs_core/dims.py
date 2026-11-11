@@ -154,8 +154,16 @@ _MIXED = re.compile(r"(?<![\d./])(\d+)[\s\u00a0-]+(\d{1,2})\s*/\s*(\d{1,2})(?![\
 _FRACTION = re.compile(r"(?<![\d./])(\d{1,2})\s*/\s*(\d{1,2})(?![\d/])")
 
 
+_GLYPHS = {"½": "1/2", "¼": "1/4", "¾": "3/4", "⅛": "1/8", "⅜": "3/8", "⅝": "5/8", "⅞": "7/8", "⅓": "1/3", "⅔": "2/3"}
+# "3-seat sofa", "3 x 1-seat section", "set of 2", "6-drawer": counts, never lengths
+_COUNTS = re.compile(r"(?:\b\d+\s*[x×]\s*)?\b\d+[\s-]*(?:seat(?:er|s)?|pieces?|pcs?|pack|drawers?|doors?|tiers?|shel(?:f|ves)|persons?|lights?|bulbs?)\b|\bset of \d+\b", re.I)
+
+
 def unfraction(text: str) -> str:
-    """'18 7/8' -> '18.875', '3/4' -> '0.75': inch sizes are often printed as fractions."""
+    """'18 7/8' -> '18.875', '3/4' -> '0.75', '7 ½' -> '7.5': inch sizes are often printed as fractions."""
+    for glyph, plain_text in _GLYPHS.items():
+        if glyph in text:
+            text = text.replace(glyph, " " + plain_text)
 
     def mixed(m: re.Match) -> str:
         den = int(m.group(3))
@@ -217,7 +225,7 @@ def _parse_dimensions(text: str | None, default_unit: str | None = None, categor
     if not text or not isinstance(text, str):
         return None
     raw = text.strip()
-    s = raw.replace("×", "x").replace("＊", "*")
+    s = _COUNTS.sub(" ", raw.replace("×", "x").replace("＊", "*"))
     s = re.sub(r"(\d)\s*(?:''|’’|″|\u201d)", r'\1"', s)  # two apostrophes are an inch mark, not feet
     s = re.sub(r"\b(in|ft|cm|mm|inch|inches)\.(?=\s|$)", r"\1", s, flags=re.I)  # "58 in. W"
     s = re.sub(r"\(\s*([WDHL])\s*\)", r" \1 ", s, flags=re.I)  # "180 cm (L)"
@@ -310,6 +318,8 @@ def _parse_dimensions(text: str | None, default_unit: str | None = None, categor
         nums = [_to_float(mt.group(1)), _to_float(mt.group(3))]
         units = [mt.group(2), mt.group(4)]
         last_unit = next((u for u in reversed(units) if u), None) or trailing_unit or default_unit
+        if last_unit is None and max(nums) <= 12:
+            return None  # "2 x 4" with no unit anywhere: a count or a model number, not a footprint in metres
         vals = []
         for v, u in zip(nums, units):
             factor, _ = _unit_factor(u or last_unit, None)

@@ -464,9 +464,48 @@ def _from_meta(page: _Page) -> dict:
 
 # ------------------------------------------------------------------ dimensions
 
+# A specification table: a name in one cell and a single length in the next
+# (<span>Width</span><span>78 "</span>, <dt>/<dd>, <th>/<td>).
+_SPEC_ROW = re.compile(r">\s*([A-Za-z][A-Za-z .()/-]{2,44}?)\s*:?\s*</(?:span|dt|th|td|div|strong|b|p)>\s*<(?:span|dd|td|div|p)\b[^>]{0,200}>\s*([^<>]{1,40}?)\s*</", re.I)
+_SPEC_VALUE = re.compile(r"^[\d.,/ \u00a0½¼¾⅛⅜⅝⅞]+\s*(?:\"|”|″|''|cm|mm|m|in|inch|inches|ft|')\.?$", re.I)
+_SPEC_NAMES = {
+    "width": ("width", "overall width", "total width"),
+    "depth": ("depth", "overall depth", "total depth"),
+    "length": ("length", "overall length", "total length"),
+    "height": ("height", "overall height", "total height", "max. height", "max height", "height including back cushions", "height including back", "height of plant"),
+    "diameter": ("diameter", "overall diameter", "diameter of plant pot", "shade diameter"),
+}
+_SPEC_KIND = {name: kind for kind, names in _SPEC_NAMES.items() for name in names}
 
-def find_dimensions(texts: list[str], category: str | None = None) -> dict | None:
-    """First fully parseable dimension line, preferring lines that announce themselves."""
+
+def spec_rows(body: str) -> str | None:
+    """The piece's own measurements from a specification table, as one labelled line.
+    Rows that measure a part ("Seat height", "Height under furniture") are not in the
+    name list, so they are never taken. None unless at least two sides are printed."""
+    got: dict[str, str] = {}
+    for m in _SPEC_ROW.finditer(body):
+        kind = _SPEC_KIND.get(re.sub(r"\s+", " ", m.group(1)).strip().lower())
+        value = html.unescape(m.group(2)).strip()
+        if kind and kind not in got and _SPEC_VALUE.match(value):
+            got[kind] = value
+        if len(got) == 5:
+            break
+    if "diameter" in got:  # round things: the diameter is both sides of the footprint
+        got.setdefault("width", got["diameter"])
+        got.setdefault("depth", got["diameter"])
+    got.pop("diameter", None)
+    if len(got) < 2:
+        return None
+    return "Overall dimensions: " + ", ".join(f"{kind.capitalize()}: {got[kind]}" for kind in ("width", "depth", "length", "height") if kind in got)
+
+
+
+def find_dimensions(texts: list[str], category: str | None = None, title: str | None = None) -> dict | None:
+    """First fully parseable dimension line, preferring lines that announce themselves.
+    A size printed in the product's own name outranks everything else on the page
+    ("comparable to a standard 8' x 10' size" is prose about it, not its size)."""
+    if title:
+        texts = [title] + list(texts)
     candidates: list[tuple[int, int, str]] = []
     size_word = re.compile(r"\b(?:%s)\b" % _SIZE_WORDS[category], re.I) if category in _SIZE_WORDS else None
     for ti, text in enumerate(texts):
@@ -474,6 +513,8 @@ def find_dimensions(texts: list[str], category: str | None = None) -> dict | Non
             if not _DIM_LINE.search(line) and not re.search(r"\b(width|depth|height|length|dimensions?)\b", line, re.I):
                 continue
             score = 0 if _PRIORITY.search(line) else 1
+            if title and ti == 0 and _DIM_LINE.search(line):
+                score = -3
             if _DEMOTE.search(line):
                 score += 2
             if size_word and size_word.search(line):  # "Queen: 68” W x 93” D" when the user asked about a queen bed
@@ -564,6 +605,7 @@ def _read_page(url: str, category: str | None, _get) -> dict:
                 return {"ok": False, "url": url, "error": {"code": e.code, "message": e.message}}
             notes.append(f"No Shopify product JSON ({e.code}); reading the page itself.")
     page = _Page()
+    table: str | None = None
     if found is None or not find_dimensions([t for t in found.get("texts", []) if t], category=category):
         try:
             body, ctype, final_url = _get(url)
@@ -571,10 +613,12 @@ def _read_page(url: str, category: str | None, _get) -> dict:
             return {"ok": False, "url": url, "error": {"code": e.code, "message": e.message}}
         if _looks_like_challenge(body):
             return {"ok": False, "url": final_url, "error": {"code": "blocked", "message": "The site answered with a bot-check page instead of the product. Ask the user for the sizes printed on the page."}}
+        decoded = body.decode("utf-8", "replace")
         try:
-            page.feed(body.decode("utf-8", "replace"))
+            page.feed(decoded)
         except Exception:  # noqa: BLE001 - a broken page is not an exception for the user
             pass
+        table = spec_rows(decoded)
         ld = _from_jsonld(page.jsonld)
         if ld:
             found = {**ld, **{k: v for k, v in (found or {}).items() if v and k != "texts"}, "texts": ld.get("texts", []) + (found or {}).get("texts", [])}
@@ -585,8 +629,9 @@ def _read_page(url: str, category: str | None, _get) -> dict:
         for k in ("title", "image_url", "price"):
             found[k] = found.get(k) or meta.get(k)
     # the product's own name first: some shops print the size there ("Nightstand 18 7/8x15 3/8x24 3/8")
-    texts = [str(found.get("title") or "")] + list(found.get("texts") or []) + [meta["texts"][0], "\n".join(page.text), _script_lines(page.scripts)]
-    parsed = find_dimensions([t for t in texts if t], category=category)
+    # then the page's specification table, where the sides are named
+    texts = [table or ""] + list(found.get("texts") or []) + [meta["texts"][0], "\n".join(page.text), _script_lines(page.scripts)]
+    parsed = find_dimensions([t for t in texts if t], category=category, title=str(found.get("title") or "") or None)
 
     out: dict[str, Any] = {
         "ok": True,

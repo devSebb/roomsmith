@@ -205,3 +205,75 @@ def test_sizes_written_the_way_shops_write_them(text, category, want):
 def test_a_rug_is_read_from_its_two_measurements_and_is_not_an_estimate():
     r = read(html({"@type": "Product", "name": "Geometric area rug", "description": "Size: 4 ft 10.5 in x 7 ft 3 in", "offers": {"price": "90", "priceCurrency": "USD"}}), "rug")
     assert [round(v, 2) for v in r["dimensions_m"]][::2] == [1.49, 2.21] and not r["dims"].get("height_assumed")
+
+
+# ---- found in a large live run (an office, 26 pieces)
+
+
+def test_counts_are_not_sizes():
+    from rs_core import dims
+
+    assert dims.parse_dimensions("3 x 1-seat section", category="sofa") is None
+    assert dims.parse_dimensions("2 x 4") is None  # no unit anywhere
+    got = dims.parse_dimensions("3-seat sofa 228x95x83 cm", category="sofa")
+    assert (got["width_m"], got["depth_m"], got["height_m"]) == (2.28, 0.95, 0.83)
+    got = dims.parse_dimensions("Set of 2 chairs 50 x 55 x 80 cm", category="chair")
+    assert got["height_m"] == 0.8
+    assert dims.parse_dimensions("Rug 160x230", category="rug")["depth_m"] == 2.3  # bare centimetres still read
+
+
+def test_fraction_glyphs_and_spaced_feet_marks():
+    from rs_core import dims
+
+    got = dims.parse_dimensions('Rug, flatwoven 7 \' 10 "x9 \' 10 "', category="rug")
+    assert (got["width_m"], got["depth_m"]) == (2.3876, 2.9972)
+    assert dims.parse_dimensions('7 ½ "x9 ¾ "x3 "')["width_m"] == 0.1905
+
+
+_SPEC_SOFA = (
+    '<li><span class="n">Height including back cushions</span><span class="v">32 5/8 &quot;</span></li>'
+    '<li><span class="n">Backrest height</span><span class="v">27 1/8 &quot;</span></li>'
+    '<li><span class="n">Width</span><span class="v">78 &quot;</span></li>'
+    '<li><span class="n">Depth</span><span class="v">39 &quot;</span></li>'
+    '<li><span class="n">Height under furniture</span><span class="v">5 1/2 &quot;</span></li>'
+    '<li><span class="n">Seat width</span><span class="v">73 1/4 &quot;</span></li>'
+    '<li><span class="n">Seat height</span><span class="v">15 3/4 &quot;</span></li>'
+)
+
+
+def test_specification_table_gives_the_piece_not_its_parts():
+    from rs_core import dims, product_fetch
+
+    line = product_fetch.spec_rows(_SPEC_SOFA)
+    got = dims.parse_dimensions(line, category="sofa")
+    assert (got["width_m"], got["depth_m"], got["height_m"]) == (1.9812, 0.9906, 0.8287)
+    assert not got.get("partial")
+
+
+def test_specification_table_round_piece_and_too_little():
+    from rs_core import dims, product_fetch
+
+    plant = '<span>Height of plant</span><span>57 &quot;</span><span>Diameter of plant pot</span><span>7 ½ &quot;</span>'
+    got = dims.parse_dimensions(product_fetch.spec_rows(plant), category="plant")
+    assert (got["width_m"], got["depth_m"], got["height_m"]) == (0.1905, 0.1905, 1.4478)
+    assert product_fetch.spec_rows('<span>Seat height</span><span>18 "</span><span>Width</span><span>30 "</span>') is None
+    assert product_fetch.spec_rows('<span>Width</span><span>lots of text, call us</span><span>Depth</span><span>soon</span>') is None
+
+
+def test_page_with_a_specification_table_is_read():
+    from rs_core import product_fetch
+
+    page = ('<html><head><title>Sofa</title><meta property="og:title" content="SODER Sofa - light beige"></head><body>'
+            '<p>3 x 1-seat section</p><ul>' + _SPEC_SOFA + '</ul></body></html>').encode()
+    out = product_fetch.fetch_product("https://shop.example/p/soder-sofa", "sofa", _get=lambda url, **kw: (page, "text/html", url))
+    assert out["dimensions_m"] == [1.9812, 0.8287, 0.9906]
+    assert "Seat" not in out["dimensions_text"]
+
+
+def test_size_in_the_product_name_beats_prose_about_a_standard_size():
+    from rs_core import product_fetch
+
+    page = ('<html><head><meta property="og:title" content="TID Rug, flatwoven - beige 7 \' 10 &quot;x9 \' 10 &quot;"></head>'
+            "<body><p>This rug is comparable to a standard 8' x 10' size.</p></body></html>").encode()
+    out = product_fetch.fetch_product("https://shop.example/p/tid-rug", "rug", _get=lambda url, **kw: (page, "text/html", url))
+    assert out["dimensions_m"] == [2.3876, 0.01, 2.9972]
